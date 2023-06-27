@@ -469,6 +469,14 @@ def configure(run,ship_geo):
  timeDet.SetSizeY(2 * ship_geo.TimeDet.DY)
  detectorList.append(timeDet)
 
+ z_coord = [-3100, -2820, -2507]
+  #z_coord = []
+ for i in range(len(z_coord)):
+  scorplane = ROOT.ScoringPlane("sc_pl_" + str(i), ROOT.kTRUE, ROOT.kFALSE, 116.7, 253.5, 0.1)
+  scorplane.SetVetoPointName("sco" + "_" + str(i))
+  scorplane.SetZposition(z_coord[i])
+  detectorList.append(scorplane)
+
 #-----   Magnetic field   -------------------------------------------
  if not hasattr(ship_geo.Bfield,"fieldMap"):
   if ship_geo.strawDesign == 4 or ship_geo.strawDesign == 10 : fMagField = ROOT.ShipBellField("wilfried", ship_geo.Bfield.max ,ship_geo.Bfield.z,2,ship_geo.Yheight/2.*u.m )  
