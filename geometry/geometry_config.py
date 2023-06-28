@@ -62,6 +62,8 @@ if "SC_mag" not in globals():
     SC_mag = False
 if "scName" not in globals():
     scName = None
+if "params" not in globals():
+    params = None
 
 with ConfigRegistry.register_config("basic") as c:
     c.SC_mag = SC_mag
@@ -366,7 +368,8 @@ with ConfigRegistry.register_config("basic") as c:
             f.Close()
         else:
             assert scName
-            params = shield_db[scName]
+            if params is None:
+                params = shield_db[scName]
             c.muShield.params = params
         c.muShield.dZ1 = 0.35*u.m + zGap
         c.muShield.dZ2 = 2.26*u.m + zGap
