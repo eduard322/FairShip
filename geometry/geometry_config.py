@@ -68,6 +68,7 @@ if "params" not in globals():
 with ConfigRegistry.register_config("basic") as c:
     c.SC_mag = SC_mag
     c.scName = scName
+    c.params = params
     # global muShieldDesign, targetOpt, strawDesign, Yheight
     c.Yheight = Yheight*u.m
     # decision by the SP 
