@@ -76,7 +76,7 @@ default = '2023'
 
 inactivateMuonProcesses = False   # provisionally for making studies of various muon background sources
 shield_db = {}
-with open("$FAIRSHIP/geometry/shield_db.json", 'r') as shields:
+with open(f"{os.getenv('FAIRSHIP')}/geometry/shield_db.json", 'r') as shields:
   shield_db = json.load(shields)
 
 parser = ArgumentParser()
