@@ -12,6 +12,7 @@ import shipRoot_conf
 import rootUtils as ut
 from ShipGeoConfig import ConfigRegistry
 from argparse import ArgumentParser
+import json
 
 DownScaleDiMuon = False
 
@@ -74,6 +75,9 @@ globalDesigns = {
 default = '2023'
 
 inactivateMuonProcesses = False   # provisionally for making studies of various muon background sources
+shield_db = {}
+with open("$FAIRSHIP/files/shield_db.json", 'r') as shields:
+  shield_db = json.load(shields)
 
 parser = ArgumentParser()
 group = parser.add_mutually_exclusive_group()
@@ -214,7 +218,7 @@ if options.charm == 0: ship_geo = ConfigRegistry.loadpy("$FAIRSHIP/geometry/geom
                                                 muShieldDesign = options.ds, nuTauTargetDesign=options.nud, CaloDesign=options.caloDesign, \
                                                 strawDesign=options.strawDesign, muShieldGeo=options.geofile,
                                                 muShieldStepGeo=options.muShieldStepGeo, muShieldWithCobaltMagnet=options.muShieldWithCobaltMagnet, 
-                                                SC_mag=options.SC_mag, scName=options.scName)
+                                                SC_mag=options.SC_mag, scName=options.scName, params=shield_db[options.scName])
 else: 
  ship_geo = ConfigRegistry.loadpy("$FAIRSHIP/geometry/charm-geometry_config.py", Setup = options.CharmdetSetup, cTarget = options.CharmTarget)
  if options.CharmdetSetup == 0: print("Setup for muon flux measurement has been set")
