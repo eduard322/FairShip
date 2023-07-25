@@ -733,7 +733,8 @@ with ConfigRegistry.register_config("basic") as c:
      
     c.NuTauTarget.target = 1  #number of neutrino target volumes
 
-    c.NuTauTarget.nuTargetPassive = nuTargetPassive
+    # c.NuTauTarget.nuTargetPassive = nuTargetPassive
+    c.NuTauTarget.nuTargetPassive = 0
 
     # space for the structure that holds the brick
     c.NuTauTarget.Ydist = 0.0*u.cm
