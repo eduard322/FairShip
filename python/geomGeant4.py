@@ -154,6 +154,12 @@ def addVMCFields(shipGeo, controlFile = '', verbose = False, withVirtualMC = Tru
                                 ROOT.TVector3(0.0, 0.0, shipGeo.Bfield.z))      
       fieldsList.append('MainSpecMap')
 
+      
+      # set SC field map
+      fieldMaker.defineFieldMap('SCMap','files/SCFieldMap_metres_quad.root', ROOT.TVector3(0.0,0.0, -4831.9220), ROOT.TVector3(0.0,0.0, 0.0), True)
+      fieldsList.append('SCMap')
+      
+      
       if shipGeo.EmuMagnet.MagneticField:
        withConstFieldNuTauDet = False
        if hasattr(shipGeo.EmuMagnet,'WithConstField'): withConstFieldNuTauDet = shipGeo.EmuMagnet.WithConstField

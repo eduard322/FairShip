@@ -67,15 +67,15 @@ def createRootMap(inFileName, rootFileName, cmScale, storeCoords):
 
     # Co-ordinate ranges
     rStruct = ROOT.rangeStruct()
-    rangeTree.Branch('xMin', ROOT.AddressOf(rStruct, 'xMin'), 'xMin/F')
-    rangeTree.Branch('xMax', ROOT.AddressOf(rStruct, 'xMax'), 'xMax/F')
-    rangeTree.Branch('dx', ROOT.AddressOf(rStruct, 'dx'), 'dx/F')
-    rangeTree.Branch('yMin', ROOT.AddressOf(rStruct, 'yMin'), 'yMin/F')
-    rangeTree.Branch('yMax', ROOT.AddressOf(rStruct, 'yMax'), 'yMax/F')
-    rangeTree.Branch('dy', ROOT.AddressOf(rStruct, 'dy'), 'dy/F')
-    rangeTree.Branch('zMin', ROOT.AddressOf(rStruct, 'zMin'), 'zMin/F')
-    rangeTree.Branch('zMax', ROOT.AddressOf(rStruct, 'zMax'), 'zMax/F')
-    rangeTree.Branch('dz', ROOT.AddressOf(rStruct, 'dz'), 'dz/F')
+    rangeTree.Branch('xMin', ROOT.addressof(rStruct, 'xMin'), 'xMin/F')
+    rangeTree.Branch('xMax', ROOT.addressof(rStruct, 'xMax'), 'xMax/F')
+    rangeTree.Branch('dx', ROOT.addressof(rStruct, 'dx'), 'dx/F')
+    rangeTree.Branch('yMin', ROOT.addressof(rStruct, 'yMin'), 'yMin/F')
+    rangeTree.Branch('yMax', ROOT.addressof(rStruct, 'yMax'), 'yMax/F')
+    rangeTree.Branch('dy', ROOT.addressof(rStruct, 'dy'), 'dy/F')
+    rangeTree.Branch('zMin', ROOT.addressof(rStruct, 'zMin'), 'zMin/F')
+    rangeTree.Branch('zMax', ROOT.addressof(rStruct, 'zMax'), 'zMax/F')
+    rangeTree.Branch('dz', ROOT.addressof(rStruct, 'dz'), 'dz/F')
 
     rStruct.xMin = rangeInfo['xMin']
     rStruct.xMax = rangeInfo['xMax']
@@ -88,14 +88,14 @@ def createRootMap(inFileName, rootFileName, cmScale, storeCoords):
     rStruct.dz = rangeInfo['dz']
     
     # Centre the field map on the local origin (cm)
-    x0 = 0.5*(rStruct.xMin + rStruct.xMax)
-    y0 = 0.5*(rStruct.yMin + rStruct.yMax)
-    z0 = 0.5*(rStruct.zMin + rStruct.zMax)
+    # x0 = 0.5*(rStruct.xMin + rStruct.xMax)
+    # y0 = 0.5*(rStruct.yMin + rStruct.yMax)
+    # z0 = 0.5*(rStruct.zMin + rStruct.zMax)
 
     # Use this if we don't want to centre the field map
-    #x0 = 0.0
-    #y0 = 0.0
-    #z0 = 0.0
+    x0 = 0.0
+    y0 = 0.0
+    z0 = 0.5*(rStruct.zMin + rStruct.zMax)
 
     print('Centering field map using co-ordinate shift {0} {1} {2} cm'.format(x0, y0, z0))
     
@@ -126,13 +126,13 @@ def createRootMap(inFileName, rootFileName, cmScale, storeCoords):
     # of y and z bins
     dStruct = ROOT.dataStruct()
     if storeCoords is True:
-        dataTree.Branch('x', ROOT.AddressOf(dStruct, 'x'), 'x/F')
-        dataTree.Branch('y', ROOT.AddressOf(dStruct, 'y'), 'y/F')
-        dataTree.Branch('z', ROOT.AddressOf(dStruct, 'z'), 'z/F')
+        dataTree.Branch('x', ROOT.addressof(dStruct, 'x'), 'x/F')
+        dataTree.Branch('y', ROOT.addressof(dStruct, 'y'), 'y/F')
+        dataTree.Branch('z', ROOT.addressof(dStruct, 'z'), 'z/F')
 
-    dataTree.Branch('Bx', ROOT.AddressOf(dStruct, 'Bx'), 'Bx/F')
-    dataTree.Branch('By', ROOT.AddressOf(dStruct, 'By'), 'By/F')
-    dataTree.Branch('Bz', ROOT.AddressOf(dStruct, 'Bz'), 'Bz/F')
+    dataTree.Branch('Bx', ROOT.addressof(dStruct, 'Bx'), 'Bx/F')
+    dataTree.Branch('By', ROOT.addressof(dStruct, 'By'), 'By/F')
+    dataTree.Branch('Bz', ROOT.addressof(dStruct, 'Bz'), 'Bz/F')
                 
     # Reopen the file and store the information in the ROOT file
     with open(inFileName, 'r') as f:
@@ -235,5 +235,6 @@ def findRanges(inFileName, cmScale):
 
 if __name__ == "__main__":
 
-    run('GoliathFieldMap.txt', 'GoliathFieldMap.root', 0.1, True)
+    # run('GoliathFieldMap.txt', 'GoliathFieldMap.root', 0.1, True)
+    run('Piet2DMap_SCMag11_ECN3final_chosenv6.txt', 'SCFieldMap_metres_quad.root', 100, True)
     #run('BFieldTest.txt', 'BFieldTest.root', 1.0)

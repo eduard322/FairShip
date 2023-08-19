@@ -176,7 +176,7 @@ void ShipMuonShield::CreateArb8(TString arbName, TGeoMedium *medium,
       if (fWithConstAbsorberField) {
           magF->SetField(magField);
       }
-  } else if (fWithConstShieldField) {
+  } else if (fWithConstShieldField && !arbName.Contains("Magn2")) {
       magF->SetField(magField);
   }
   tShield->AddNode(magF, 1, new TGeoTranslation(x_translation, y_translation,
