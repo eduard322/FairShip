@@ -156,7 +156,7 @@ def addVMCFields(shipGeo, controlFile = '', verbose = False, withVirtualMC = Tru
 
       
       # set SC field map
-      fieldMaker.defineFieldMap('SCMap','files/SCFieldMap_metres_quad.root', ROOT.TVector3(0.0,0.0, -4831.9220), ROOT.TVector3(0.0,0.0, 0.0), True)
+      fieldMaker.defineFieldMap('SCMap','files/SCFieldMap_comsol_invert.root', ROOT.TVector3(0.0,0.0, -4831.9220), ROOT.TVector3(0.0,0.0, 0.0), True)
       fieldsList.append('SCMap')
       
       

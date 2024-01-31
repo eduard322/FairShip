@@ -236,5 +236,5 @@ def findRanges(inFileName, cmScale):
 if __name__ == "__main__":
 
     # run('GoliathFieldMap.txt', 'GoliathFieldMap.root', 0.1, True)
-    run('Piet2DMap_SCMag11_ECN3final_chosenv6.txt', 'SCFieldMap_metres_quad.root', 100, True)
-    #run('BFieldTest.txt', 'BFieldTest.root', 1.0)
+    #run('Piet2DMap_SCMag11_ECN3final_chosenv6.txt', 'SCFieldMap_metres_quad.root', 100, True)
+    run('out_field_comsol_invert.txt', 'out_field_comsol_invert.root', 100)
