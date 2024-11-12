@@ -36,7 +36,7 @@ charmonly    = False  # option to be set with -A to enable only charm decays, ch
 HNL          = True
 
 inputFile    = "/eos/experiment/ship/data/Charm/Cascade-parp16-MSTP82-1-MSEL4-978Bpot.root"
-defaultInputFile = True
+defaultInputFile = False
 
 globalDesigns = {
      '2016' : {
@@ -449,7 +449,8 @@ if simEngine == "nuRadiography":
  Geniegen = ROOT.GenieGenerator()
  Geniegen.Init(inputFile,options.firstEvent)
  # Geniegen.SetPositions(ship_geo.target.z0, ship_geo.target.z0, ship_geo.MuonStation3.z)
- Geniegen.SetPositions(ship_geo.target.z0, ship_geo.tauMudet.zMudetC, ship_geo.MuonStation3.z)
+ # Geniegen.SetPositions(ship_geo.target.z0, ship_geo.tauMudet.zMudetC, ship_geo.MuonStation3.z)
+ Geniegen.SetPositions(ship_geo.target.z0, -3650.,-3150.)
  Geniegen.NuOnly()
  primGen.AddGenerator(Geniegen)
  print('Generate ',options.nEvents,' for nuRadiography', ' first event',options.firstEvent)
