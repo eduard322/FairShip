@@ -884,6 +884,30 @@ def configure(run, ship_geo):
                 ship_geo.Yheight / 2.0 * u.m,
             )
         run.SetField(fMagField)
+    z_coord = []
+    # gap
+    z_0 = -4483.8440 + 0.15
+    z_dist = 20.0
+    z_coord += [z_0 + i*z_dist for i in range(10)]
+    # magnet 4
+    z_0 = -4223.5280 - 0.15
+    z_dist = 8.8417*2 + 0.3
+    z_coord += [z_0 + i*z_dist for i in range(20)]    
+    # magnet 5
+    z_0 = -3853.8600 - 0.15
+    z_dist = 7.1096*2 + 0.3
+    z_coord += [z_0 + i*z_dist for i in range(20)]    
+    # magnet 6
+    z_0 = -3553.4740 - 0.15
+    z_dist = 8.9406*2 + 0.3
+    z_coord += [z_0 + i*z_dist for i in range(20)]
+    # z_coord = []
+    #z_coord = []
+    for i in range(len(z_coord)):
+      scorplane = ROOT.ScoringPlane("sc_pl_" + str(i), ROOT.kTRUE, ROOT.kFALSE, 100., 100., 0.1)
+      scorplane.SetVetoPointName("sco" + "_" + str(i))
+      scorplane.SetZposition(z_coord[i])
+      detectorList.append(scorplane)
     #
     exclusionList = []
     # exclusionList = ["Muon","Ecal","Hcal","Strawtubes","TargetTrackers","NuTauTarget","HighPrecisionTrackers",\

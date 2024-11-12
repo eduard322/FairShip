@@ -983,7 +983,7 @@ void ShipMuonShield::ConstructGeometry()
   TGeoUniformMagField *ConLField_s    = new TGeoUniformMagField(ironField_s,0.,0.);
   TGeoUniformMagField *fields_s[4] = {magFieldIron_s,RetField_s,ConRField_s,ConLField_s};
   Int_t split_num = 20;
-  if(nM == 7){
+  if(nM >= 4){
     Double_t spl_shift_X = (dXOut[nM] - dXIn[nM]) / split_num;
     Double_t spl_shift_Y = (dYOut[nM] - dYIn[nM]) / split_num;
     Double_t spl_shift_midgap = (midGapOut[nM] - midGapIn[nM]) / split_num;
@@ -1008,7 +1008,7 @@ void ShipMuonShield::ConstructGeometry()
       // Double_t HmainSideMagIn_spl = HmainSideMagIn[nM];
       Double_t HmainSideMagOut_spl = HmainSideMagIn[nM] + spl_shift_HmainsideMag*(spl+1);
       Double_t gap_btw = 0.15;
-      if(spl == 0) gap_btw = 0.0;
+      // if(spl == 0) gap_btw = 0.0;
       CreateMagnet(magnetName[nM] + TString::Format("_%d", spl), iron, tShield, fields_s, fieldDirection[nM],
             dXIn_spl, dYIn_spl, dXOut_spl, dYOut_spl, spl_dZ - gap_btw,
            midgapIn_spl, midgapOut_spl, HmainSideMagIn_spl,
