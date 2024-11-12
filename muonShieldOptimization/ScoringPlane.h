@@ -1,5 +1,5 @@
-#ifndef EXITHADRONABSORBER_H
-#define EXITHADRONABSORBER_H
+#ifndef SCORINGPLANE_H
+#define SCORINGPLANE_H
 
 #include "FairDetector.h"
 #include "TVector3.h"
@@ -7,13 +7,12 @@
 #include "TGeoVolume.h"
 #include "vetoPoint.h"
 #include "TNtuple.h"
-#include "TFile.h"
 #include <map>
 
 class FairVolume;
 class TClonesArray;
 
-class exitHadronAbsorber: public FairDetector
+class ScoringPlane: public FairDetector
 {
 
   public:
@@ -22,13 +21,21 @@ class exitHadronAbsorber: public FairDetector
      *       Active: kTRUE for active detectors (ProcessHits() will be called)
      *               kFALSE for inactive detectors
     */
-    exitHadronAbsorber(const char* Name, Bool_t Active);
+    ScoringPlane(const char* Name, Bool_t Active, Bool_t islastdetector);
+
+    /**      Name :  Detector Name
+     *       Active: kTRUE for active detectors (ProcessHits() will be called)
+     *               kFALSE for inactive detectors
+     *       geometry: full x, y and z extents in cm are Lx, Ly, Lz
+    */
+    ScoringPlane(const char* Name, Bool_t Active, Bool_t islastdetector, 
+                       Double_t Lx, Double_t Ly, Double_t Lz);
 
     /**      default constructor    */
-    exitHadronAbsorber();
+    ScoringPlane();
 
     /**       destructor     */
-    virtual ~exitHadronAbsorber();
+    virtual ~ScoringPlane();
 
     /**      Initialization of the detector is done here    */
     virtual void   Initialize();
@@ -59,7 +66,7 @@ class exitHadronAbsorber: public FairDetector
     virtual void   SetSpecialPhysicsCuts() {;}
     virtual void   EndOfEvent();
     virtual void   FinishPrimary() {;}
-    virtual void   FinishRun();
+    virtual void   FinishRun() {;}
     virtual void   BeginPrimary() {;}
     virtual void   PostTrack() {;}
     virtual void   PreTrack();
@@ -69,35 +76,50 @@ class exitHadronAbsorber: public FairDetector
                              TVector3 pos, TVector3 mom,
                              Double_t time, Double_t length,
                              Double_t eLoss,Int_t pdgcode,TVector3 Lpos, TVector3 Lmom);
-    inline void SetEnergyCut(Float_t emax) {EMax=emax;}// min energy to be copied to Geant4
-    inline void SetOnlyMuons(){fOnlyMuons=kTRUE;}
+    //inline void SetEnergyCut(Float_t emax) {EMax=emax;}// min energy to be copied to Geant4
+    inline void SetOnlyMuons(){fOnlyMuons=kTRUE; std::cout<<"Massi ScoringPlane.SetOnlyMuons(): fOnlyMuons="<<fOnlyMuons<<std::endl;}
     inline void SetOpt4DP(){withNtuple=kTRUE;}
-    inline void SkipNeutrinos(){fSkipNeutrinos=kTRUE;}
+    //inline void SkipNeutrinos(){fSkipNeutrinos=kTRUE;}
     inline void SetZposition(Float_t x){fzPos=x;}
+    inline void SetIsLast(Bool_t islast){fLastDetector=islast;} // Added by Massi
+    inline void SetVetoPointName(TString nam){fVetoName=nam;} // Added by Massi
+    // kill all tracks except of muons:
+    void SetFastMuon() {fFastMuon=true; std::cout<<"Massi ScoringPlane.SetFastMuon(): fFastMuon="<<fFastMuon<<std::endl;} 
+    // make muon shield active to follow muons:
+    void SetFollowMuon() {fFollowMuon=true;std::cout<<"Massi ScoringPlane.SetFollowMuon(): fFollowMuon="<<fFollowMuon<<std::endl;} 
 
   private:
 
     /** Track information to be stored until the track leaves the
     active volume.
     */
+    Bool_t     fFastMuon, fFollowMuon;
     Int_t          fTrackID;           //!  track index
     Int_t          fVolumeID;          //!  volume id
     TLorentzVector fPos;               //!  position at entrance
     TLorentzVector fMom;               //!  momentum at entrance
     Double_t     fTime;              //!  time
     Double_t     fLength;            //!  length
+    Double_t     fELoss;             //!  energy loss
     Double_t     fzPos;              //!  zPos, optional
     Bool_t withNtuple;               //! special option for Dark Photon physics studies
     TNtuple* fNtuple;               //!  
-    Float_t EMax;  //! max energy to transport
-    Bool_t fOnlyMuons;  //! flag if only muons should be stored
-    Bool_t fSkipNeutrinos;  //! flag if neutrinos should be ignored
+    //Float_t EMax;  //! max energy to transport
+    Bool_t fOnlyMuons;      //! flag if only muons should be stored
+    //Bool_t fSkipNeutrinos;  //! flag if neutrinos should be ignored
     TFile* fout; //!
     TClonesArray* fElectrons; //!
     Int_t index;
     /** container for data points */
-    TClonesArray*  fexitHadronAbsorberPointCollection;
-    ClassDef(exitHadronAbsorber, 0)
+    TClonesArray*  fScoringPlanePointCollection;
+    ClassDef(ScoringPlane, 0)
+    // massi, add this to control the stopMC:
+    Bool_t fLastDetector;  //! if True then stop processing particles after this detector 
+    Double_t     fLx;      //!  x full extent in cm 
+    Double_t     fLy;      //!  y full extent in cm 
+    Double_t     fLz;      //!  z full extent in cm 
+
+    TString fVetoName;
 };
 
-#endif //EXITHADRONABSORBER_H
+#endif //SCORINGPLANE_H
