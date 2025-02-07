@@ -16,13 +16,13 @@ shipRoot_conf.configure()
 
 
 
-xsec = "gxspl-FNAL-nuSHiP-minimal.xml"# new adapted splines from Genie site
+xsec = "gxspl-FNALsmall.xml"# new adapted splines from Genie site
 hfile = "pythia8_Geant4_1.0_withCharm_nu.root" #2018 background generation
 #xsec = "Nu_splines.xml"
 #hfile = "pythia8_Geant4-withCharm_onlyNeutrinos.root"
 
 
-defaultsplinedir   = '/eos/experiment/ship/user/aiuliano/GENIE_FNAL_nu_splines' #path of splines
+defaultsplinedir   = '/eos/experiment/ship/user/edursov/genie/genie_xsec/v3_02_00/NULL/G1802a00000-k250-e1000/data' #path of splines
 defaultfiledir  = '/eos/experiment/ship/data/Mbias/background-prod-2018' #path of flux
 
 
@@ -45,7 +45,7 @@ def get_arguments(): #available options
   ap.add_argument('-n', '--nevents', type=int, help="number of events", dest='nevents', default=100)
   ap.add_argument('-e', '--event-generator-list', type=str, help="event generator list", dest='evtype', default=None) # Possbile evtypes: CC, CCDIS, CCQE, CharmCCDIS, RES, CCRES, see other evtypes in $GENIE/config/EventGeneratorListAssembler.xml
   ap.add_argument("--nudet", dest="nudet", help="option for neutrino detector", required=False, action="store_true")
-
+  ap.add_argument('-p','--particles', dest ="particles", type = int, help="particles", default=16)
   ap1 = subparsers.add_parser('spline',help="make a new cross section spline file")
   ap1.add_argument('-t', '--target', type=str, help="target material", dest='target', default='iron')
   ap1.add_argument('-o','--output'    , type=str, help="output directory", dest='work_dir', default=None)
@@ -82,8 +82,8 @@ def makeEvents(nevents = 100):
  run = 11
  for p in pDict:
   if p<0: print("scale number of "+sDict[p]+" events with %5.2F"%(1./nuOverNubar[abs(p)]))
-  if not sDict[p] in os.listdir('.'): call('mkdir '+sDict[p],shell = True)
-  os.chdir('./'+sDict[p])
+  # if not sDict[p] in os.listdir('.'): call('mkdir '+sDict[p],shell = True)
+  # os.chdir('./'+sDict[p])
   # stop at 350 GeV, otherwise strange warning about "Lower energy neutrinos have a higher probability of
   # interacting than those at higher energy. pmaxLow(E=386.715)=2.157e-13 and  pmaxHigh(E=388.044)=2.15623e-13"
   N = nevents
@@ -91,13 +91,13 @@ def makeEvents(nevents = 100):
   genie_interface.generate_genie_events(nevents = N, nupdg = p, targetcode = targetcode, emin = 0.5, emax = 350,\
                       inputflux = neutrinos, spline = splines, seed = args.seed, process = args.evtype, irun = run)
   run +=1
-  os.chdir('../')
+  # os.chdir('../')
 def makeNtuples():
  for p in pDict:
-  os.chdir('./'+sDict[p])
+  # os.chdir('./'+sDict[p])
   genie_interface.make_ntuples("gntp.0.ghep.root","genie-"+sDict[p]+".root")
   genie_interface.add_hists(neutrinos, "genie-"+sDict[p]+".root", p)
-  os.chdir('../')
+  # os.chdir('../')
 
 def addHists():
  for p in pDict:
@@ -126,13 +126,15 @@ else:
  sDict = {}
  nuOverNubar = {}
  f = ROOT.TFile(neutrinos)
-
- for x in [16, 14,12]:
+#  parts = [args.particles] if len(args.particles) == 1 else args.particles
+ parts = [args.particles]
+ for x in parts:
   sDict[x] = pdg.GetParticle(x).GetName()
-  sDict[-x] = pdg.GetParticle(-x).GetName()
+  #sDict[-x] = pdg.GetParticle(-x).GetName()
   pDict[x]  = "10"+str(x)
-  pDict[-x] = "20"+str(x)
-  nuOverNubar[x] = f.Get(pDict[x]).GetSumOfWeights()/f.Get(pDict[-x]).GetSumOfWeights()
+  #pDict[-x] = "20"+str(x)
+  # nuOverNubar[x] = f.Get(pDict[x]).GetSumOfWeights()/f.Get(pDict[-x]).GetSumOfWeights()
+  nuOverNubar[x] = 1
  f.Close()
 
  makeEvents(args.nevents)

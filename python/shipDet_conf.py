@@ -902,11 +902,11 @@ def configure(run, ship_geo):
     z_coord += [z_0 + i*z_dist for i in range(20)]
     # z_coord = []
     #z_coord = []
-    for i in range(len(z_coord)):
-      scorplane = ROOT.ScoringPlane("sc_pl_" + str(i), ROOT.kTRUE, ROOT.kFALSE, 100., 100., 0.1)
-      scorplane.SetVetoPointName("sco" + "_" + str(i))
-      scorplane.SetZposition(z_coord[i])
-      detectorList.append(scorplane)
+    # for i in range(len(z_coord)):
+    #   scorplane = ROOT.ScoringPlane("sc_pl_" + str(i), ROOT.kTRUE, ROOT.kFALSE, 100., 100., 0.1)
+    #   scorplane.SetVetoPointName("sco" + "_" + str(i))
+    #   scorplane.SetZposition(z_coord[i])
+    #   detectorList.append(scorplane)
     #
     exclusionList = []
     # exclusionList = ["Muon","Ecal","Hcal","Strawtubes","TargetTrackers","NuTauTarget","HighPrecisionTrackers",\
