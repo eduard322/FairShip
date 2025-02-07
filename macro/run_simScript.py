@@ -3,7 +3,6 @@ import os
 import sys
 import ROOT
 ROOT.gSystem.Load('libEGPythia8')
-import makeALPACAEvents
 
 import shipunit as u
 import shipRoot_conf
@@ -86,7 +85,6 @@ parser.add_argument("-A",        dest="A",       help="b: signal from b, c: from
 parser.add_argument("--Genie",   dest="genie",   help="Genie for reading and processing neutrino interactions", required=False, action="store_true")
 parser.add_argument("--NuRadio", dest="nuradio", help="misuse GenieGenerator for neutrino radiography and geometry timing test", required=False, action="store_true")
 parser.add_argument("--Ntuple",  dest="ntuple",  help="Use ntuple as input", required=False, action="store_true")
-group.add_argument("--ALPACA",  dest="ALPACA",  help="Use ALPACA as input", required=False, action="store_true")
 parser.add_argument("--MuonBack",dest="muonback",  help="Generate events from muon background file, --Cosmics=0 for cosmic generator data", required=False, action="store_true")
 parser.add_argument("--FollowMuon",dest="followMuon", help="Make muonshield active to follow muons", required=False, action="store_true")
 parser.add_argument("--FastMuon",  dest="fastMuon",  help="Only transport muons for a fast muon only background estimate", required=False, action="store_true")
@@ -137,11 +135,20 @@ parser.add_argument("--scName", help="The name of the SC shield in the database"
 parser.add_argument("--MesonMother",   dest="MM",  help="Choose DP production meson source", required=False,  default=True)
 parser.add_argument("--debug",  help="1: print weights and field 2: make overlap check", required=False, default=0, type=int, choices=range(0,3))
 parser.add_argument(
-     "--helium",
-     help="Replace vacuum with helium (vessel structure unchanged)",
-     action="store_const",
-     const="helium",
-     default="vacuums"
+    "--helium",
+    dest="decayVolMed", 
+    help="Set Decay Volume medium to helium. NOOP, as default is helium",
+    action="store_const",
+    const="helium",
+    default="helium"
+)
+parser.add_argument(
+    "--vacuums",
+    dest="decayVolMed",
+    help="Set Decay Volume medium to vacuum(vessel structure changes)",
+    action="store_const",
+    const="vacuums",
+    default="helium"
 )
 parser.add_argument("--SND", dest="SND", help="Activate SND.", action='store_true')
 parser.add_argument("--noSND", dest="SND", help="Deactivate SND. NOOP, as it currently defaults to off.", action='store_false')
@@ -155,7 +162,6 @@ if options.pg:       simEngine = "PG"
 if options.genie:    simEngine = "Genie"
 if options.nuradio:  simEngine = "nuRadiography"
 if options.ntuple:   simEngine = "Ntuple"
-if options.ALPACA:   simEngine = "ALPACA"
 if options.muonback: simEngine = "MuonBack"
 if options.nuage:    simEngine = "Nuage"
 if options.mudis:    simEngine = "muonDIS"
@@ -228,7 +234,7 @@ ship_geo = ConfigRegistry.loadpy(
      muShieldWithCobaltMagnet=options.muShieldWithCobaltMagnet,
      SC_mag=options.SC_mag,
      scName=options.scName,
-     DecayVolumeMedium=options.helium,
+     DecayVolumeMedium=options.decayVolMed,
      SND=options.SND,
 )
 
@@ -326,24 +332,6 @@ if simEngine == "Pythia8":
 # P8gen.SetMom(500.*u.GeV)
 # P8gen.SetId(-211)
  primGen.AddGenerator(P8gen)
-
-if simEngine == "ALPACA":
-  print('Generating ALP events of mass {} GeV with the photon coupling coefficient {} GeV^-1'.format(options.theMass, options.theDPepsilon))
-  target     = ship_geo.target
-  startZ     = target.z0
-  lengthZ    = target.length
-  endZ       = startZ + lengthZ
-  SmearBeam  = 1*u.cm # finite beam size
-  Lmin       = ((ship_geo.Chamber1.z - ship_geo.chambers.Tub1length) - ship_geo.target.z0)/100.
-  Lmax       = (ship_geo.TrackStation1.z - ship_geo.target.z0)/100.
-  print('ALPACA is initializing.')
-  inputFile  = makeALPACAEvents.runEvents(options.theMass,options.theDPepsilon,options.nEvents,Lmin,Lmax,startZ,endZ,SmearBeam)
-  if inputFile: print('ALPACA is done.')
-  ut.checkFileExists(inputFile)
-  ALPACAgen = ROOT.ALPACAGenerator()
-  ALPACAgen.Init(inputFile)
-  print('ALPACAGenerator is reading the ALPACA events')
-  primGen.AddGenerator(ALPACAgen)
 
 if simEngine == "FixedTarget":
  P8gen = ROOT.FixedTargetGenerator()
