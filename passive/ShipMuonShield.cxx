@@ -514,15 +514,6 @@ Int_t ShipMuonShield::Initialize(std::vector<TString> &magnetName,
 
     std::vector<Double_t> params;
     params = shield_params;
-    // if (!fSC_mag)
-    // {
-    //   TVectorT<Double_t> paramsR;
-    //   auto f = TFile::Open(fGeofile, "read");
-    //   paramsR.Read("params");
-    //   for (int i = 0; i < 56; i++){params.push_back(paramsR[i]);}
-    // }else{
-    //   params = shield_params;
-    // }
 
     const int offset = 7;
 
@@ -970,11 +961,9 @@ void ShipMuonShield::ConstructGeometry()
         continue;
       }
   Double_t ironField_s_SC = fField * fieldScale[nM] * tesla;
-  // Bool_t SC_key = false;
   if(nM == 3 && fSC_mag){
     Double_t SC_FIELD = 5.1;
     ironField_s_SC = SC_FIELD * fieldScale[nM] * tesla;
-    // SC_key = true;
   }
   // END
   Double_t ironField_s = fField * fieldScale[nM] * tesla;
