@@ -63,7 +63,7 @@ ShipMuonShield::ShipMuonShield(TString geofile,
 }
 
 ShipMuonShield::ShipMuonShield(TVectorT<Double_t> in_params,
-Double_t floor, const Int_t withCoMagnet, const Bool_t StepGeo, const Bool_t WithConstAbsorberField, const Bool_t WithConstShieldField)
+Double_t floor, const Int_t withCoMagnet, const Bool_t StepGeo, const Bool_t WithConstAbsorberField, const Bool_t WithConstShieldField,  const Bool_t SC_key)
   : FairModule("MuonShield", "ShipMuonShield")
 {
   for(int i = 0; i < 56; i++){
@@ -75,7 +75,7 @@ Double_t floor, const Int_t withCoMagnet, const Bool_t StepGeo, const Bool_t Wit
   fWithCoMagnet = withCoMagnet;
   Double_t LE = 7 * m;
   fDesign = 8;
-  fSC_mag = true;
+  fSC_mag = SC_key;
   fField = 1.7;
   dZ0 = 1 * m;
   dZ1 = 0.4 * m;
@@ -513,15 +513,16 @@ Int_t ShipMuonShield::Initialize(std::vector<TString> &magnetName,
     };
 
     std::vector<Double_t> params;
-    if (!fSC_mag)
-    {
-      TVectorT<Double_t> paramsR;
-      auto f = TFile::Open(fGeofile, "read");
-      paramsR.Read("params");
-      for (int i = 0; i < 56; i++){params.push_back(paramsR[i]);}
-    }else{
-      params = shield_params;
-    }
+    params = shield_params;
+    // if (!fSC_mag)
+    // {
+    //   TVectorT<Double_t> paramsR;
+    //   auto f = TFile::Open(fGeofile, "read");
+    //   paramsR.Read("params");
+    //   for (int i = 0; i < 56; i++){params.push_back(paramsR[i]);}
+    // }else{
+    //   params = shield_params;
+    // }
 
     const int offset = 7;
 
@@ -980,11 +981,11 @@ void ShipMuonShield::ConstructGeometry()
         continue;
       }
   Double_t ironField_s_SC = fField * fieldScale[nM] * tesla;
-  Bool_t SC_key = false;
+  // Bool_t SC_key = false;
   if(nM == 3 && fSC_mag){
     Double_t SC_FIELD = 5.1;
     ironField_s_SC = SC_FIELD * fieldScale[nM] * tesla;
-    SC_key = true;
+    // SC_key = true;
   }
   // END
   Double_t ironField_s = fField * fieldScale[nM] * tesla;
@@ -993,45 +994,11 @@ void ShipMuonShield::ConstructGeometry()
   TGeoUniformMagField *ConRField_s    = new TGeoUniformMagField(-ironField_s,0.,0.);
   TGeoUniformMagField *ConLField_s    = new TGeoUniformMagField(ironField_s,0.,0.);
   TGeoUniformMagField *fields_s[4] = {magFieldIron_s,RetField_s,ConRField_s,ConLField_s};
-  Int_t split_num = 20;
-  if(nM >= 4){
-    Double_t spl_shift_X = (dXOut[nM] - dXIn[nM]) / split_num;
-    Double_t spl_shift_Y = (dYOut[nM] - dYIn[nM]) / split_num;
-    Double_t spl_shift_midgap = (midGapOut[nM] - midGapIn[nM]) / split_num;
-    Double_t spl_shift_gap = (gapOut[nM] - gapIn[nM]) / split_num;
-    Double_t spl_shift_HmainsideMag = (HmainSideMagOut[nM] - HmainSideMagIn[nM]) / split_num;
-    Double_t spl_dZ = dZf[nM] / split_num;
-    // Double_t Z_shift = Z[nM];
-    for(int spl = 0; spl < split_num; spl++){
-      Double_t dXIn_spl = dXIn[nM] + spl_shift_X*spl;
-      // Double_t dXIn_spl = dXIn[nM];
-      Double_t dXOut_spl = dXIn[nM] + spl_shift_X*(spl+1);
-      Double_t dYIn_spl = dYIn[nM] + spl_shift_Y*spl;
-      // Double_t dYIn_spl = dYIn[nM];
-      Double_t dYOut_spl = dYIn[nM] + spl_shift_Y*(spl+1);  
-      Double_t midgapIn_spl = midGapIn[nM] + spl_shift_midgap*spl;
-      // Double_t midgapIn_spl = midGapIn[nM];
-      Double_t midgapOut_spl = midGapIn[nM] + spl_shift_midgap*(spl+1);    
-      Double_t gapIn_spl = gapIn[nM] + spl_shift_gap*spl;
-      // Double_t gapIn_spl = gapIn[nM];
-      Double_t gapOut_spl = gapIn[nM] + spl_shift_gap*(spl+1);
-      Double_t HmainSideMagIn_spl = HmainSideMagIn[nM] + spl_shift_HmainsideMag*spl;
-      // Double_t HmainSideMagIn_spl = HmainSideMagIn[nM];
-      Double_t HmainSideMagOut_spl = HmainSideMagIn[nM] + spl_shift_HmainsideMag*(spl+1);
-      Double_t gap_btw = 0.15;
-      // if(spl == 0) gap_btw = 0.0;
-      CreateMagnet(magnetName[nM] + TString::Format("_%d", spl), iron, tShield, fields_s, fieldDirection[nM],
-            dXIn_spl, dYIn_spl, dXOut_spl, dYOut_spl, spl_dZ - gap_btw,
-           midgapIn_spl, midgapOut_spl, HmainSideMagIn_spl,
-            HmainSideMagOut_spl, gapIn_spl, gapOut_spl, Z[nM] + (2*spl - (split_num-1))*spl_dZ, nM==8, fStepGeo, SC_key);
-    }
-  }
-  else{
-    CreateMagnet(magnetName[nM], iron, tShield, fields_s, fieldDirection[nM],
+  CreateMagnet(magnetName[nM], iron, tShield, fields_s, fieldDirection[nM],
           dXIn[nM], dYIn[nM], dXOut[nM], dYOut[nM], dZf[nM],
           midGapIn[nM], midGapOut[nM], HmainSideMagIn[nM],
-          HmainSideMagOut[nM], gapIn[nM], gapOut[nM], Z[nM], nM==8, fStepGeo, SC_key);
-  }
+          HmainSideMagOut[nM], gapIn[nM], gapOut[nM], Z[nM], nM==8, fStepGeo, nM == 3 && fSC_mag);
+
 
 	if (nM==8 || !fSupport) continue;
 	Double_t dymax = std::max(dYIn[nM] + dXIn[nM], dYOut[nM] + dXOut[nM]);
