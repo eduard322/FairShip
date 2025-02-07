@@ -100,6 +100,7 @@ def generate_genie_events(
     # optional additional arguments
     if process is not None:
         cmd = cmd + " --event-generator-list " + process  # add a specific process
+        cmd = cmd + " --message-thresholds $GENIE/config/Messenger_laconic.xml"
     if seed is not None:
         cmd = cmd + " --seed " + str(seed)  # set a seed for the generator
     if irun is not None:

@@ -201,8 +201,8 @@ if (HNL and options.RPVSUSY) or (HNL and options.DarkPhoton) or (options.DarkPho
  print("cannot have HNL and SUSY or DP at the same time, abort")
  sys.exit(2)
 
-if (simEngine == "Genie" or simEngine == "nuRadiography") and defaultInputFile:
-  inputFile = "/eos/experiment/ship/data/GenieEvents/genie-nu_mu.root"
+# if (simEngine == "Genie" or simEngine == "nuRadiography") and defaultInputFile:
+#   inputFile = "/eos/experiment/ship/data/GenieEvents/genie-nu_mu.root"
             # "/eos/experiment/ship/data/GenieEvents/genie-nu_mu_bar.root"
 if simEngine == "muonDIS" and defaultInputFile:
   print('input file required if simEngine = muonDIS')
@@ -426,10 +426,10 @@ if simEngine == "Genie":
  primGen.SetTarget(0., 0.) # do not interfere with GenieGenerator
  Geniegen = ROOT.GenieGenerator()
  Geniegen.Init(inputFile,options.firstEvent)
- Geniegen.SetPositions(ship_geo.target.z0, ship_geo.tauMudet.zMudetC-5*u.m, ship_geo.TrackStation2.z)
+ Geniegen.SetPositions(ship_geo.target.z0, -3554., -3170.)
  primGen.AddGenerator(Geniegen)
  options.nEvents = min(options.nEvents,Geniegen.GetNevents())
- run.SetPythiaDecayer("DecayConfigNuAge.C")
+#  run.SetPythiaDecayer("DecayConfigNuAge.C")
  print('Generate ',options.nEvents,' with Genie input', ' first event',options.firstEvent)
 if simEngine == "nuRadiography":
  ut.checkFileExists(inputFile)
@@ -437,7 +437,7 @@ if simEngine == "nuRadiography":
  Geniegen = ROOT.GenieGenerator()
  Geniegen.Init(inputFile,options.firstEvent)
  # Geniegen.SetPositions(ship_geo.target.z0, ship_geo.target.z0, ship_geo.MuonStation3.z)
- # Geniegen.SetPositions(ship_geo.target.z0, ship_geo.tauMudet.zMudetC, ship_geo.MuonStation3.z)
+#  Geniegen.SetPositions(ship_geo.target.z0, ship_geo.tauMudet.zMudetC, ship_geo.MuonStation3.z)
  Geniegen.SetPositions(ship_geo.target.z0, -3650.,-3150.)
  Geniegen.NuOnly()
  primGen.AddGenerator(Geniegen)
