@@ -19,7 +19,7 @@ it in future.
 ### Added
 
 ### Changed
-
+* Setting up the Muon shield geometry by ROOT files is completely replaced with the temporary solution of dict in the ```geometry/geometry_config.py```. Set up the shield name is now done by --shieldName key instead of --scName.
 ### Removed
 
 ## 25.01
