@@ -557,8 +557,8 @@ if options.debug == 1:
  geomGeant4.printWeightsandFields(onlyWithField = True,\
              exclude=['DecayVolume','Tr1','Tr2','Tr3','Tr4','Veto','Ecal','Hcal','MuonDetector','SplitCal'])
 # Plot the field example
-#fieldMaker.plotField(1, ROOT.TVector3(-9000.0, 6000.0, 50.0), ROOT.TVector3(-300.0, 300.0, 6.0), 'Bzx.png')
-#fieldMaker.plotField(2, ROOT.TVector3(-9000.0, 6000.0, 50.0), ROOT.TVector3(-400.0, 400.0, 6.0), 'Bzy.png')
+fieldMaker.plotField(1, ROOT.TVector3(-3520, -3000.0, 50.0), ROOT.TVector3(-300.0, 300.0, 6.0), 'Bzx.png')
+fieldMaker.plotField(2, ROOT.TVector3(-3520, -3000.0, 50.0), ROOT.TVector3(-400.0, 400.0, 6.0), 'Bzy.png')
 
 if inactivateMuonProcesses :
  ROOT.gROOT.ProcessLine('#include "Geant4/G4ProcessTable.hh"')

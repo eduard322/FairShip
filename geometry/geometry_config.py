@@ -74,9 +74,9 @@ with ConfigRegistry.register_config("basic") as c:
         ironThick=5 * u.cm,       # Magnetised iron thickness
         sciFiThick=0.5 * u.cm,    # SciFi layer thickness
         scintThick=2 * u.cm,      # Scintillator layer thickness
-        nLayers=50,               # Number of sandwich layers
-        zPosition=-3500 * u.cm,   # Global z position
-        fieldY=1.7 * u.tesla,     # Magnetic field strength (Y-axis)
+        nLayers=45,               # Number of sandwich layers
+        zPosition=-3343.64 * u.cm,   # Global z position
+        fieldY=-1.7 * u.tesla,     # Magnetic field strength (Y-axis)
         isActive=True             # Activation flag
     )
 
