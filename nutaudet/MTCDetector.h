@@ -34,7 +34,7 @@ private:
 
     MTCDetector(const MTCDetector&);
     MTCDetector& operator=(const MTCDetector&);
-
+    Int_t InitMedium(const char* name);
     ClassDef(MTCDetector, 1)
 };
 

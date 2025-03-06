@@ -925,6 +925,14 @@ void ShipMuonShield::ConstructGeometry()
       auto *ECN3_shift = new TGeoTranslation("ECN3_shift", 3.435 * m, 2.64 * m, ECN3_length / 2. + stair_step_length / 2.);
       ECN3_shift->RegisterYourself();
 
+      // Define the excavation floor with 45 cm thickness (half-thickness 0.225 m)
+      auto *excavation_floor = new TGeoBBox("excavation_floor", 4.995*m, 0.30*m, 6*m);
+
+      // Position it so that its top aligns with the muon shield cavern's floor at y = -1.70 m.
+      // Calculation: y_center = -1.70 m - 0.225 m = -1.925 m.
+      auto *excavation_floor_shift = new TGeoTranslation("excavation_floor_shift", 1.435*m, -2.00*m, -6*m);
+      excavation_floor_shift->RegisterYourself();
+      
       auto *yoke_pit = new TGeoBBox("yoke_pit", 3.5 * m, 4.3 * m + 1 * cm, 2.5 * m);
       auto *yoke_pit_shift = new TGeoTranslation("yoke_pit_shift", 0 * m, 0 * m, 31 * m - z_transition);
       yoke_pit_shift->RegisterYourself();
@@ -993,11 +1001,12 @@ void ShipMuonShield::ConstructGeometry()
       TGeoVolume *absorber = new TGeoVolume("AbsorberVol", absorberShape, iron);
       absorber->SetLineColor(42); // brown / light red
       tShield->AddNode(absorber, 1, new TGeoTranslation(0, 0, zEndOfAbsorb + absorber_half_length + absorber_offset));
-
+                                              // "- stair_step:stair_step_shift"
       auto *compRock = new TGeoCompositeShape("compRock",
                                               "rock - muon_shield_cavern:TCC8_shift"
                                               "- experiment_cavern:ECN3_shift"
                                               "- stair_step:stair_step_shift"
+                                              "- excavation_floor:excavation_floor_shift"
                                               "- yoke_pit:yoke_pit_shift"
                                               "- target_pit:target_pit_shift"
       );

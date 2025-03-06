@@ -6,6 +6,35 @@
 #include "TGeoUniformMagField.h"
 #include "FairRootManager.h"
 
+#include "TGeoBBox.h"
+#include "TGeoTrd1.h"
+#include "TGeoCompositeShape.h"
+#include "TGeoTube.h"
+#include "TGeoMaterial.h"
+#include "TGeoMedium.h"
+#include "TParticle.h"
+#include "TVector3.h"
+
+#include "FairVolume.h"
+#include "FairGeoVolume.h"
+#include "FairGeoNode.h"
+#include "FairRootManager.h"
+#include "FairGeoLoader.h"
+#include "FairGeoInterface.h"
+#include "FairGeoMedia.h"
+#include "FairGeoBuilder.h"
+#include "FairRun.h"
+#include "FairRuntimeDb.h"
+
+#include "ShipDetectorList.h"
+#include "ShipUnit.h"
+#include "ShipStack.h"
+
+#include "TGeoUniformMagField.h"
+#include <stddef.h>                     // for NULL
+#include <iostream>                     // for operator<<, basic_ostream, etc
+
+
 TGeoVolume* CreateSegmentedLayer(const char* name, Double_t width, Double_t height,
                                 Double_t thickness, Double_t cellSizeX, Double_t cellSizeY,
                                 TGeoMedium* material, Int_t color, Double_t transparency) {
@@ -44,6 +73,27 @@ MTCDetector::~MTCDetector() {
     }
 }
 
+// -----   Private method InitMedium
+Int_t MTCDetector::InitMedium(const char* name)
+{
+    static FairGeoLoader *geoLoad=FairGeoLoader::Instance();
+    static FairGeoInterface *geoFace=geoLoad->getGeoInterface();
+    static FairGeoMedia *media=geoFace->getMedia();
+    static FairGeoBuilder *geoBuild=geoLoad->getGeoBuilder();
+
+    FairGeoMedium *ShipMedium=media->getMedium(name);
+
+    if (!ShipMedium)
+    {
+        Fatal("InitMedium","Material %s not defined in media file.", name);
+        return -1111;
+    }
+    TGeoMedium* medium=gGeoManager->GetMedium(name);
+    if (medium!=NULL)
+        return ShipMedium->getMediumIndex();
+    return geoBuild->createMedium(ShipMedium);
+}
+
 void MTCDetector::SetMTCParameters(Double_t w, Double_t h, Double_t iron, 
                                   Double_t sciFi, Double_t scint, Int_t layers,
                                   Double_t z, Double_t field) {
@@ -58,6 +108,8 @@ void MTCDetector::SetMTCParameters(Double_t w, Double_t h, Double_t iron,
 }
 
 void MTCDetector::ConstructGeometry() {
+    InitMedium("SciFiMat");
+    TGeoMedium *SciFiMat = gGeoManager->GetMedium("SciFiMat");
     Double_t layerThickness = fIronThick + fSciFiThick + fScintThick;
     Double_t totalLength = fLayers * layerThickness;
 
