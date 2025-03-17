@@ -34,6 +34,7 @@ TargetPoint.cxx
 TargetTracker.cxx
 TTPoint.cxx
 MTCDetector.cxx
+MTCdetPoint.cxx
 )
 
 Set(HEADERS )

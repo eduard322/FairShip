@@ -4,6 +4,17 @@
 #include "FairDetector.h"
 #include "TGeoMatrix.h"
 #include "TClonesArray.h"
+#include "Rtypes.h"                     // for ShipMuonShield::Class, Bool_t, etc
+
+#include <string>                       // for string
+#include "MTCdetPoint.h"
+
+#include "TVector3.h"
+#include "TLorentzVector.h"
+
+class MTCdetPoint;
+class FairVolume;
+class TClonesArray;
 
 class MTCDetector : public FairDetector {
 public:
@@ -17,6 +28,10 @@ public:
     virtual void ConstructGeometry();
     virtual void Initialize();
     virtual Bool_t ProcessHits(FairVolume* vol = 0);
+    MTCdetPoint* AddHit(Int_t trackID, Int_t detID,
+        TVector3 pos, TVector3 mom,
+        Double_t time, Double_t length,
+        Double_t eLoss, Int_t pdgCode);
     virtual void Register();
     virtual TClonesArray* GetCollection(Int_t iColl) const;
     virtual void Reset();

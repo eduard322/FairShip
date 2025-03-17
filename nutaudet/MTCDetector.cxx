@@ -5,6 +5,7 @@
 #include "TGeoMedium.h"
 #include "TGeoUniformMagField.h"
 #include "FairRootManager.h"
+#include "MTCdetPoint.h"
 
 #include "TGeoBBox.h"
 #include "TGeoTrd1.h"
@@ -35,6 +36,54 @@
 #include <iostream>                     // for operator<<, basic_ostream, etc
 
 
+
+// #include "NuTauMudet.h"
+// #include "ShipRpcPoint.h"
+#include "TGeoManager.h"
+#include "FairRun.h"                    // for FairRun
+#include "FairRuntimeDb.h"              // for FairRuntimeDb
+#include <iosfwd>                    // for ostream
+#include "TList.h"                      // for TListIter, TList (ptr only)
+#include "TObjArray.h"                  // for TObjArray
+#include "TString.h"                    // for TString
+#include "TClonesArray.h"
+#include "TVirtualMC.h"
+
+#include "TGeoPara.h"
+#include "TGeoBBox.h"
+#include "TGeoTrd1.h"
+#include "TGeoTrd2.h"
+#include "TGeoCompositeShape.h"
+#include "TGeoTube.h"
+#include "TGeoMaterial.h"
+#include "TGeoMedium.h"
+#include "TParticle.h"
+#include "TVector3.h"
+
+#include "FairVolume.h"
+#include "FairGeoVolume.h"
+#include "FairGeoNode.h"
+#include "FairRootManager.h"
+#include "FairGeoLoader.h"
+#include "FairGeoInterface.h"
+#include "FairGeoMedia.h"
+#include "FairGeoBuilder.h"
+#include "FairRun.h"
+#include "FairRuntimeDb.h"
+
+#include "ShipDetectorList.h"
+#include "ShipUnit.h"
+#include "ShipStack.h"
+
+#include "TGeoUniformMagField.h"
+#include <stddef.h>                     // for NULL
+#include <iostream>                     // for operator<<, basic_ostream, etc
+
+using std::cout;
+using std::endl;
+using namespace ShipUnit;
+
+
 TGeoVolume* CreateSegmentedLayer(const char* name, Double_t width, Double_t height,
                                 Double_t thickness, Double_t cellSizeX, Double_t cellSizeY,
                                 TGeoMedium* material, Int_t color, Double_t transparency) {
@@ -61,7 +110,21 @@ TGeoVolume* CreateSegmentedLayer(const char* name, Double_t width, Double_t heig
     return motherVol;
 }
 
-strawtubes::strawtubes(const char* name, Double_t zCenter, Bool_t Active, const char* Title, Int_t DetId)
+MTCDetector::MTCDetector()
+  : FairDetector("MTC", kTRUE, kMTC),
+    fTrackID(-1),
+    fPdgCode(),
+    fVolumeID(-1),
+    fPos(),
+    fMom(),
+    fTime(-1.),
+    fLength(-1.),
+    fELoss(-1),
+    fMTCDetectorPointCollection(new TClonesArray("MTCdetPoint"))
+{
+}
+
+MTCDetector::MTCDetector(const char* name, Double_t zCenter, Bool_t Active, const char* Title, Int_t DetId)
     : FairDetector(name, Active, kMTC)
     , fTrackID(-1)
     , fVolumeID(-1)
@@ -71,7 +134,7 @@ strawtubes::strawtubes(const char* name, Double_t zCenter, Bool_t Active, const 
     , fLength(-1.)
     , fELoss(-1)
     , fZCenter(zCenter)
-    , fMTCDetectorPointCollection(new TClonesArray("MTCdet"))
+    , fMTCDetectorPointCollection(new TClonesArray("MTCdetPoint"))
 {}
 
 MTCDetector::~MTCDetector() {
@@ -116,64 +179,179 @@ void MTCDetector::SetMTCParameters(Double_t w, Double_t h, Double_t iron,
 }
 
 
-// Helper function to build the composite SciFi module (fiber module)
+// // Helper function to build the composite SciFi module (fiber module)
+// TGeoVolume* CreateSciFiModule(const char* name, Double_t width, Double_t height, Double_t thickness) {
+//     // Here we follow the GEANT4 substructure:
+//     //   Lower internal iron: 3 mm  (0.3 cm)
+//     //   Fiber Mat 1 (U):      1.35 mm (0.135 cm)
+//     //   Air Gap:              1 mm  (0.1 cm)
+//     //   Fiber Mat 2 (V):      1.35 mm (0.135 cm)
+//     //   Upper internal iron:  3 mm  (0.3 cm)
+//     // Total = 0.3 + 0.135 + 0.1 + 0.135 + 0.3 = 1.0 cm (which should equal thickness)
+  
+//     Double_t lowerIronThick = 0.3;
+//     Double_t fiberMatThick  = 0.135;
+//     Double_t airGap         = 0.1;
+//     Double_t upperIronThick = 0.3;
+  
+//     // Mother volume for the SciFi module
+//     TGeoBBox* modMother = new TGeoBBox(Form("%s_mother", name), width/2, height/2, thickness/2);
+//     // We use the SciFi material for the mother; adjust if you have a dedicated one
+//     TGeoVolume* modMotherVol = new TGeoVolume(Form("%s_mother", name), modMother, gGeoManager->GetMedium("SciFiMat"));
+//     modMotherVol->SetLineColor(kGreen+2);
+//     modMotherVol->SetTransparency(40);
+  
+//     // --- Lower Internal Iron ---
+//     TGeoBBox* lowerIronBox = new TGeoBBox(Form("%s_lowerIron", name), width/2, height/2, lowerIronThick/2);
+//     TGeoVolume* lowerIronVol = new TGeoVolume(Form("%s_lowerIron", name), lowerIronBox, gGeoManager->GetMedium("iron"));
+//     lowerIronVol->SetLineColor(kGray+1);
+//     lowerIronVol->SetTransparency(20);
+//     // Position: at the bottom of the module
+//     modMotherVol->AddNode(lowerIronVol, 1, new TGeoTranslation(0, 0, -thickness/2 + lowerIronThick/2));
+  
+//     // --- Fiber Mat U ---
+//     TGeoBBox* fiberMatBoxU = new TGeoBBox(Form("%s_fiberMat_U", name), width/2, height/2, fiberMatThick/2);
+//     TGeoVolume* fiberMatVolU = new TGeoVolume(Form("%s_fiberMat_U", name), fiberMatBoxU, gGeoManager->GetMedium("SciFiMat"));
+//     fiberMatVolU->SetLineColor(kYellow);
+//     fiberMatVolU->SetTransparency(30);
+//     // Position: above lower iron
+//     modMotherVol->AddNode(fiberMatVolU, 1, new TGeoTranslation(0, 0, -thickness/2 + lowerIronThick + fiberMatThick/2));
+  
+//     // --- Fiber Mat V ---
+//     TGeoBBox* fiberMatBoxV = new TGeoBBox(Form("%s_fiberMat_V", name), width/2, height/2, fiberMatThick/2);
+//     TGeoVolume* fiberMatVolV = new TGeoVolume(Form("%s_fiberMat_V", name), fiberMatBoxV, gGeoManager->GetMedium("SciFiMat"));
+//     fiberMatVolV->SetLineColor(kYellow);
+//     fiberMatVolV->SetTransparency(30);
+//     // Position: above Fiber Mat U plus air gap
+//     modMotherVol->AddNode(fiberMatVolV, 1, new TGeoTranslation(0, 0, -thickness/2 + lowerIronThick + fiberMatThick + airGap + fiberMatThick/2));
+  
+//     // --- Upper Internal Iron ---
+//     TGeoBBox* upperIronBox = new TGeoBBox(Form("%s_upperIron", name), width/2, height/2, upperIronThick/2);
+//     TGeoVolume* upperIronVol = new TGeoVolume(Form("%s_upperIron", name), upperIronBox, gGeoManager->GetMedium("iron"));
+//     upperIronVol->SetLineColor(kGray+1);
+//     upperIronVol->SetTransparency(20);
+//     // Position: at the top of the module
+//     modMotherVol->AddNode(upperIronVol, 1, new TGeoTranslation(0, 0, thickness/2 - upperIronThick/2));
+  
+//     // Optionally, you can add fiber placements inside the fiber mats here.
+  
+//     return modMotherVol;
+//   }
+
+
+
+// Updated SciFi module builder with fiber placements
 TGeoVolume* CreateSciFiModule(const char* name, Double_t width, Double_t height, Double_t thickness) {
-    // Here we follow the GEANT4 substructure:
-    //   Lower internal iron: 3 mm  (0.3 cm)
-    //   Fiber Mat 1 (U):      1.35 mm (0.135 cm)
-    //   Air Gap:              1 mm  (0.1 cm)
-    //   Fiber Mat 2 (V):      1.35 mm (0.135 cm)
-    //   Upper internal iron:  3 mm  (0.3 cm)
-    // Total = 0.3 + 0.135 + 0.1 + 0.135 + 0.3 = 1.0 cm (which should equal thickness)
-  
-    Double_t lowerIronThick = 0.3;
-    Double_t fiberMatThick  = 0.135;
-    Double_t airGap         = 0.1;
-    Double_t upperIronThick = 0.3;
-  
-    // Mother volume for the SciFi module
-    TGeoBBox* modMother = new TGeoBBox(Form("%s_mother", name), width/2, height/2, thickness/2);
-    // We use the SciFi material for the mother; adjust if you have a dedicated one
-    TGeoVolume* modMotherVol = new TGeoVolume(Form("%s_mother", name), modMother, gGeoManager->GetMedium("SciFiMat"));
-    modMotherVol->SetLineColor(kGreen+2);
-    modMotherVol->SetTransparency(40);
-  
-    // --- Lower Internal Iron ---
-    TGeoBBox* lowerIronBox = new TGeoBBox(Form("%s_lowerIron", name), width/2, height/2, lowerIronThick/2);
-    TGeoVolume* lowerIronVol = new TGeoVolume(Form("%s_lowerIron", name), lowerIronBox, gGeoManager->GetMedium("iron"));
-    lowerIronVol->SetLineColor(kGray+1);
-    lowerIronVol->SetTransparency(20);
-    // Position: at the bottom of the module
-    modMotherVol->AddNode(lowerIronVol, 1, new TGeoTranslation(0, 0, -thickness/2 + lowerIronThick/2));
-  
-    // --- Fiber Mat U ---
-    TGeoBBox* fiberMatBoxU = new TGeoBBox(Form("%s_fiberMat_U", name), width/2, height/2, fiberMatThick/2);
-    TGeoVolume* fiberMatVolU = new TGeoVolume(Form("%s_fiberMat_U", name), fiberMatBoxU, gGeoManager->GetMedium("SciFiMat"));
-    fiberMatVolU->SetLineColor(kYellow);
-    fiberMatVolU->SetTransparency(30);
-    // Position: above lower iron
-    modMotherVol->AddNode(fiberMatVolU, 1, new TGeoTranslation(0, 0, -thickness/2 + lowerIronThick + fiberMatThick/2));
-  
-    // --- Fiber Mat V ---
-    TGeoBBox* fiberMatBoxV = new TGeoBBox(Form("%s_fiberMat_V", name), width/2, height/2, fiberMatThick/2);
-    TGeoVolume* fiberMatVolV = new TGeoVolume(Form("%s_fiberMat_V", name), fiberMatBoxV, gGeoManager->GetMedium("SciFiMat"));
-    fiberMatVolV->SetLineColor(kYellow);
-    fiberMatVolV->SetTransparency(30);
-    // Position: above Fiber Mat U plus air gap
-    modMotherVol->AddNode(fiberMatVolV, 1, new TGeoTranslation(0, 0, -thickness/2 + lowerIronThick + fiberMatThick + airGap + fiberMatThick/2));
-  
-    // --- Upper Internal Iron ---
-    TGeoBBox* upperIronBox = new TGeoBBox(Form("%s_upperIron", name), width/2, height/2, upperIronThick/2);
-    TGeoVolume* upperIronVol = new TGeoVolume(Form("%s_upperIron", name), upperIronBox, gGeoManager->GetMedium("iron"));
-    upperIronVol->SetLineColor(kGray+1);
-    upperIronVol->SetTransparency(20);
-    // Position: at the top of the module
-    modMotherVol->AddNode(upperIronVol, 1, new TGeoTranslation(0, 0, thickness/2 - upperIronThick/2));
-  
-    // Optionally, you can add fiber placements inside the fiber mats here.
-  
-    return modMotherVol;
+  // Define sublayer thicknesses (in cm)
+  // These values mimic the GEANT4 setup:
+  Double_t lowerIronThick = 0.3;   // 3 mm
+  Double_t fiberMatThick  = 0.135;  // 1.35 mm (each fiber mat)
+  Double_t airGap         = 0.1;    // 1 mm
+  Double_t upperIronThick = 0.3;    // 3 mm
+  // Total module thickness = 0.3 + 0.135 + 0.1 + 0.135 + 0.3 ≈ 1.0 cm
+
+  // Create the mother volume for the SciFi module
+  TGeoBBox* modMother = new TGeoBBox(Form("%s_mother", name), width/2, height/2, thickness/2);
+  TGeoVolume* modMotherVol = new TGeoVolume(Form("%s_mother", name), modMother, gGeoManager->GetMedium("SciFiMat"));
+  modMotherVol->SetLineColor(kGreen+2);
+  modMotherVol->SetTransparency(40);
+
+  // --- Lower Internal Iron ---
+  TGeoBBox* lowerIronBox = new TGeoBBox(Form("%s_lowerIron", name), width/2, height/2, lowerIronThick/2);
+  TGeoVolume* lowerIronVol = new TGeoVolume(Form("%s_lowerIron", name), lowerIronBox, gGeoManager->GetMedium("iron"));
+  lowerIronVol->SetLineColor(kGray+1);
+  lowerIronVol->SetTransparency(20);
+  modMotherVol->AddNode(lowerIronVol, 1, new TGeoTranslation(0, 0, -thickness/2 + lowerIronThick/2));
+
+  // --- Fiber Mat U (Lower SciFi Mat) ---
+  TGeoBBox* fiberMatBoxU = new TGeoBBox(Form("%s_fiberMat_U", name), width/2, height/2, fiberMatThick/2);
+  TGeoVolume* fiberMatVolU = new TGeoVolume(Form("%s_fiberMat_U", name), fiberMatBoxU, gGeoManager->GetMedium("SciFiMat"));
+  fiberMatVolU->SetLineColor(kYellow);
+  fiberMatVolU->SetTransparency(30);
+  modMotherVol->AddNode(fiberMatVolU, 1, new TGeoTranslation(0, 0, -thickness/2 + lowerIronThick + fiberMatThick/2));
+
+  // --- Fiber Mat V (Upper SciFi Mat) ---
+  TGeoBBox* fiberMatBoxV = new TGeoBBox(Form("%s_fiberMat_V", name), width/2, height/2, fiberMatThick/2);
+  TGeoVolume* fiberMatVolV = new TGeoVolume(Form("%s_fiberMat_V", name), fiberMatBoxV, gGeoManager->GetMedium("SciFiMat"));
+  fiberMatVolV->SetLineColor(kYellow);
+  fiberMatVolV->SetTransparency(30);
+  modMotherVol->AddNode(fiberMatVolV, 1, new TGeoTranslation(0, 0, -thickness/2 + lowerIronThick + fiberMatThick + airGap + fiberMatThick/2));
+
+  // --- Upper Internal Iron ---
+  TGeoBBox* upperIronBox = new TGeoBBox(Form("%s_upperIron", name), width/2, height/2, upperIronThick/2);
+  TGeoVolume* upperIronVol = new TGeoVolume(Form("%s_upperIron", name), upperIronBox, gGeoManager->GetMedium("iron"));
+  upperIronVol->SetLineColor(kGray+1);
+  upperIronVol->SetTransparency(20);
+  modMotherVol->AddNode(upperIronVol, 1, new TGeoTranslation(0, 0, thickness/2 - upperIronThick/2));
+
+  // -----------------------------
+  // Now, build the fiber arrays inside each fiber mat.
+  // Create a daughter "mother" volume in each fiber mat to hold the fibers.
+  TGeoBBox* sciFiLayerMotherUBox = new TGeoBBox(Form("%s_SciFiLayerMother_U", name), width/2, height/2, fiberMatThick/2);
+  TGeoVolume* sciFiLayerMotherUVol = new TGeoVolume(Form("%s_SciFiLayerMother_U", name), sciFiLayerMotherUBox, gGeoManager->GetMedium("SciFiMat"));
+  sciFiLayerMotherUVol->SetLineColor(kYellow);
+  sciFiLayerMotherUVol->SetTransparency(30);
+  fiberMatVolU->AddNode(sciFiLayerMotherUVol, 1, new TGeoTranslation(0, 0, 0));
+
+  TGeoBBox* sciFiLayerMotherVBox = new TGeoBBox(Form("%s_SciFiLayerMother_V", name), width/2, height/2, fiberMatThick/2);
+  TGeoVolume* sciFiLayerMotherVVol = new TGeoVolume(Form("%s_SciFiLayerMother_V", name), sciFiLayerMotherVBox, gGeoManager->GetMedium("SciFiMat"));
+  sciFiLayerMotherVVol->SetLineColor(kYellow);
+  sciFiLayerMotherVVol->SetTransparency(30);
+  fiberMatVolV->AddNode(sciFiLayerMotherVVol, 1, new TGeoTranslation(0, 0, 0));
+
+  // --- Define fiber parameters (in cm) ---
+  Double_t fSciFiBendingAngle = 5.0; // degrees
+  Double_t radAngle = fSciFiBendingAngle * TMath::DegToRad();
+  // Assume that 80% of the module width is active for fibers.
+  Double_t fSciFiActiveAreaX = width * 0.8;
+  // For the fiber length, assume the full height of the fiber mat is active.
+  Double_t fSciFiActiveAreaY = height;
+  Double_t fiberLength = fSciFiActiveAreaY * cos(radAngle);
+  Int_t numFiberLayers = 6;
+  Double_t layerThickness = fiberMatThick / numFiberLayers; // thickness per fiber layer
+  Double_t fFiberRadius = 0.01125; // 0.1125 mm in cm
+  Double_t fFiberPitch  = 0.025;    // 0.25 mm in cm
+  Int_t fNumFibers = static_cast<Int_t>(fSciFiActiveAreaX / fFiberPitch);
+
+  // --- Create the fiber volume (modeled as a tube) ---
+  TGeoTube* fiberTube = new TGeoTube("FiberTube", 0, fFiberRadius, fiberLength/2);
+  TGeoVolume* fiberVol = new TGeoVolume("FiberVol", fiberTube, gGeoManager->GetMedium("SciFiMat"));
+  fiberVol->SetLineColor(kMagenta);
+  fiberVol->SetTransparency(30);
+
+  // --- Define rotations for fibers ---
+  // For the U fibers: rotate X by 90° then Y by +5°
+  TGeoRotation* rotFiberU = new TGeoRotation();
+  rotFiberU->RotateX(90.);
+  rotFiberU->RotateY(fSciFiBendingAngle);
+  // For the V fibers: rotate X by 90° then Y by -5°
+  TGeoRotation* rotFiberV = new TGeoRotation();
+  rotFiberV->RotateX(90.);
+  rotFiberV->RotateY(-fSciFiBendingAngle);
+
+  // --- Place fibers in the U fiber mat ---
+  for (int layer = 0; layer < numFiberLayers; layer++) {
+    Double_t zCenter = -fiberMatThick/2 + (layer + 0.5) * layerThickness;
+    for (int j = 0; j < fNumFibers; j++) {
+      Double_t xPos = -fSciFiActiveAreaX/2 + (j + 0.5) * fFiberPitch;
+      // Create a combined translation+rotation
+      TGeoCombiTrans* ctU = new TGeoCombiTrans("", xPos, 0, zCenter, rotFiberU);
+      sciFiLayerMotherUVol->AddNode(fiberVol, layer * fNumFibers + j, ctU);
+    }
   }
+
+  // --- Place fibers in the V fiber mat ---
+  for (int layer = 0; layer < numFiberLayers; layer++) {
+    Double_t zCenter = -fiberMatThick/2 + (layer + 0.5) * layerThickness;
+    for (int j = 0; j < fNumFibers; j++) {
+      Double_t xPos = -fSciFiActiveAreaX/2 + (j + 0.5) * fFiberPitch;
+      TGeoCombiTrans* ctV = new TGeoCombiTrans("", xPos, 0, zCenter, rotFiberV);
+      sciFiLayerMotherVVol->AddNode(fiberVol, layer * fNumFibers + j, ctV);
+    }
+  }
+
+  return modMotherVol;
+}
 
 void MTCDetector::ConstructGeometry() {
     // Initialize media (using FairROOT’s interface)
@@ -252,29 +430,24 @@ Bool_t  MTCDetector::ProcessHits(FairVolume* vol)
 
        TParticle* p = gMC->GetStack()->GetCurrentTrack();
        Int_t pdgCode = p->GetPdgCode();
-       if (!(fOnlyMuons && TMath::Abs(pdgCode)!=13)){ 
-         fTrackID  = gMC->GetStack()->GetCurrentTrackNumber();
-         Int_t detID;
-         gMC->CurrentVolID(detID);
-         TLorentzVector Pos;
-         gMC->TrackPosition(Pos);
-         TLorentzVector Mom;
-         gMC->TrackMomentum(Mom);
-         Double_t xmean = (fPos.X()+Pos.X())/2. ;
-         Double_t ymean = (fPos.Y()+Pos.Y())/2. ;
-         Double_t zmean = (fPos.Z()+Pos.Z())/2. ;
+      Int_t detID;
+      gMC->CurrentVolID(detID);
+      TLorentzVector Pos;
+      gMC->TrackPosition(Pos);
+      TLorentzVector Mom;
+      gMC->TrackMomentum(Mom);
+      Double_t xmean = (fPos.X()+Pos.X())/2. ;
+      Double_t ymean = (fPos.Y()+Pos.Y())/2. ;
+      Double_t zmean = (fPos.Z()+Pos.Z())/2. ;
          
-         AddHit(fTrackID, detID,
+      AddHit(fTrackID, detID,
             //TVector3(xmean, ymean, zmean), put entrance and exit instead
               TVector3(fPos.X(), fPos.Y(), fPos.Z()),     // entrance position
               TVector3(fMom.Px(), fMom.Py(), fMom.Pz()),  // entrance momentum
-              fTime, fLength, fELoss,pdgCode,
-              TVector3(Pos.X(),Pos.Y(),Pos.Z()),          // exit position
-              TVector3(Mom.Px(), Mom.Py(), Mom.Pz()) );   // exit momentum
+              fTime, fLength, fELoss,pdgCode);
          ShipStack* stack = (ShipStack*) gMC->GetStack();
          stack->AddPoint(kMTC);
        }
-  }
   return kTRUE;
 }
 
@@ -282,13 +455,32 @@ Bool_t  MTCDetector::ProcessHits(FairVolume* vol)
 void MTCDetector::Register(){
     //FairRootManager::Instance()->Register("vetoPoint", "veto",
     //                                    fScoringPlanePointCollection, kTRUE);
-    TString name  = fVetoName+"Point";
-    TString title = fVetoName;
-    FairRootManager::Instance()->Register(name, title, fScoringPlanePointCollection, kTRUE);
-    std::cout << this->GetName() << ",  Register() says: registered " << fVetoName <<" collection"<<std::endl;
+    TString name  = "MTCdetPoint";
+    TString title = "MTC";
+    FairRootManager::Instance()->Register(name, title, fMTCDetectorPointCollection, kTRUE);
+    cout << this->GetName() << ",  Register() says: registered " << name <<" collection"<<endl;
   }
   
-TClonesArray* MTCDetector::GetCollection(Int_t) const { return nullptr; }
-void MTCDetector::Reset() { /* Implementation if needed */ }
+  TClonesArray* MTCDetector::GetCollection(Int_t iColl) const
+  {
+      if (iColl == 0) { return fMTCDetectorPointCollection; }
+      else { return NULL; }
+  }
+  
+  void MTCDetector::Reset()
+  {
+    fMTCDetectorPointCollection->Clear();
+  }
+  
+  MTCdetPoint* MTCDetector::AddHit(Int_t trackID, Int_t detID,
+  TVector3 pos, TVector3 mom,
+  Double_t time, Double_t length,
+  Double_t eLoss, Int_t pdgCode)
+{
+TClonesArray& clref = *fMTCDetectorPointCollection;
+Int_t size = clref.GetEntriesFast();
+cout << "adding hit detid " <<detID<<endl;
+return new(clref[size]) MTCdetPoint(trackID, detID, pos, mom,time, length, eLoss, pdgCode);
+}
 
-ClassImp(MTCDetector)
+// ClassImp(MTCDetector)
