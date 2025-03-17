@@ -61,10 +61,18 @@ TGeoVolume* CreateSegmentedLayer(const char* name, Double_t width, Double_t heig
     return motherVol;
 }
 
-MTCDetector::MTCDetector(const char* name, Double_t zCenter, Bool_t Active, const char* Title, Int_t DetId)
-    : FairDetector(name, Active, DetId),
-      fWidth(0), fHeight(0), fIronThick(0), fSciFiThick(0), fScintThick(0),
-      fLayers(0), fZCenter(zCenter), fFieldY(0), fMTCDetectorPointCollection(nullptr) {}
+strawtubes::strawtubes(const char* name, Double_t zCenter, Bool_t Active, const char* Title, Int_t DetId)
+    : FairDetector(name, Active, kMTC)
+    , fTrackID(-1)
+    , fVolumeID(-1)
+    , fPos()
+    , fMom()
+    , fTime(-1.)
+    , fLength(-1.)
+    , fELoss(-1)
+    , fZCenter(zCenter)
+    , fMTCDetectorPointCollection(new TClonesArray("MTCdet"))
+{}
 
 MTCDetector::~MTCDetector() {
     if(fMTCDetectorPointCollection) {
@@ -264,10 +272,9 @@ Bool_t  MTCDetector::ProcessHits(FairVolume* vol)
               TVector3(Pos.X(),Pos.Y(),Pos.Z()),          // exit position
               TVector3(Mom.Px(), Mom.Py(), Mom.Pz()) );   // exit momentum
          ShipStack* stack = (ShipStack*) gMC->GetStack();
-         stack->AddPoint(kVETO);
+         stack->AddPoint(kMTC);
        }
   }
-  if (fLastDetector) gMC->StopTrack();
   return kTRUE;
 }
 

@@ -22,6 +22,18 @@ public:
     virtual void Reset();
 
 private:
+
+    /** Track information to be stored until the track leaves the
+     active volume.
+     */
+     Int_t          fTrackID;           //!  track index
+     Int_t          fPdgCode;           //!  pdg code
+     Int_t          fVolumeID;          //!  volume id
+     TLorentzVector fPos;               //!  position at entrance
+     TLorentzVector fMom;               //!  momentum at entrance
+     Double32_t     fTime;              //!  time
+     Double32_t     fLength;            //!  length
+     Double32_t     fELoss;             //!  energy loss
     Double_t fWidth;
     Double_t fHeight;
     Double_t fIronThick;
