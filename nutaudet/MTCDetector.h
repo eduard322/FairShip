@@ -1,6 +1,7 @@
 #ifndef MTCDETECTOR_H
 #define MTCDETECTOR_H
 
+#include "FairModule.h"                 // for FairModule
 #include "FairDetector.h"
 #include "TGeoMatrix.h"
 #include "TClonesArray.h"
@@ -13,6 +14,7 @@
 #include "TLorentzVector.h"
 
 class MTCdetPoint;
+class FairModule;
 class FairVolume;
 class TClonesArray;
 

@@ -1,55 +1,13 @@
+// MTC detector specific headers
 #include "MTCDetector.h"
-#include "TGeoManager.h"
-#include "TGeoVolume.h"
-#include "TGeoBBox.h"
-#include "TGeoMedium.h"
-#include "TGeoUniformMagField.h"
-#include "FairRootManager.h"
 #include "MTCdetPoint.h"
-
-#include "TGeoBBox.h"
-#include "TGeoTrd1.h"
-#include "TGeoCompositeShape.h"
-#include "TGeoTube.h"
-#include "TGeoMaterial.h"
-#include "TGeoMedium.h"
-#include "TParticle.h"
-#include "TVector3.h"
-
-#include "FairVolume.h"
-#include "FairGeoVolume.h"
-#include "FairGeoNode.h"
-#include "FairRootManager.h"
-#include "FairGeoLoader.h"
-#include "FairGeoInterface.h"
-#include "FairGeoMedia.h"
-#include "FairGeoBuilder.h"
-#include "FairRun.h"
-#include "FairRuntimeDb.h"
-
 #include "ShipDetectorList.h"
 #include "ShipUnit.h"
 #include "ShipStack.h"
 
-#include "TGeoUniformMagField.h"
-#include <stddef.h>                     // for NULL
-#include <iostream>                     // for operator<<, basic_ostream, etc
-
-
-
-// #include "NuTauMudet.h"
-// #include "ShipRpcPoint.h"
+// ROOT / TGeo headers
 #include "TGeoManager.h"
-#include "FairRun.h"                    // for FairRun
-#include "FairRuntimeDb.h"              // for FairRuntimeDb
-#include <iosfwd>                    // for ostream
-#include "TList.h"                      // for TListIter, TList (ptr only)
-#include "TObjArray.h"                  // for TObjArray
-#include "TString.h"                    // for TString
-#include "TClonesArray.h"
-#include "TVirtualMC.h"
-
-#include "TGeoPara.h"
+#include "TGeoVolume.h"
 #include "TGeoBBox.h"
 #include "TGeoTrd1.h"
 #include "TGeoTrd2.h"
@@ -57,13 +15,16 @@
 #include "TGeoTube.h"
 #include "TGeoMaterial.h"
 #include "TGeoMedium.h"
+#include "TGeoUniformMagField.h"
+#include "TGeoPara.h"
 #include "TParticle.h"
 #include "TVector3.h"
 
+// FairROOT headers
+#include "FairRootManager.h"
 #include "FairVolume.h"
 #include "FairGeoVolume.h"
 #include "FairGeoNode.h"
-#include "FairRootManager.h"
 #include "FairGeoLoader.h"
 #include "FairGeoInterface.h"
 #include "FairGeoMedia.h"
@@ -71,14 +32,15 @@
 #include "FairRun.h"
 #include "FairRuntimeDb.h"
 
-#include "ShipDetectorList.h"
-#include "ShipUnit.h"
-#include "ShipStack.h"
-
-#include "TGeoUniformMagField.h"
-#include <stddef.h>                     // for NULL
-#include <iostream>                     // for operator<<, basic_ostream, etc
-
+// Additional standard headers
+#include <stddef.h>      // for NULL
+#include <iostream>      // for operator<<, basic_ostream, etc
+#include <iosfwd>        // for ostream
+#include "TList.h"       // for TListIter, TList (ptr only)
+#include "TObjArray.h"   // for TObjArray
+#include "TString.h"     // for TString
+#include "TClonesArray.h"
+#include "TVirtualMC.h"
 using std::cout;
 using std::endl;
 using namespace ShipUnit;
@@ -96,7 +58,7 @@ TGeoVolume* CreateSegmentedLayer(const char* name, Double_t width, Double_t heig
     TGeoVolume* cellVol = new TGeoVolume(Form("%s_cell", name), cell, material);
     cellVol->SetLineColor(color);
     cellVol->SetTransparency(transparency);
-
+    AddSensitiveVolume(cellVol);
     Int_t nX = Int_t(width/cellSizeX);
     Int_t nY = Int_t(height/cellSizeY);
     
@@ -241,13 +203,18 @@ void MTCDetector::SetMTCParameters(Double_t w, Double_t h, Double_t iron,
 
 
 // Updated SciFi module builder with fiber placements
-TGeoVolume* CreateSciFiModule(const char* name, Double_t width, Double_t height, Double_t thickness) {
+TGeoVolume* CreateSciFiModule(const char* name, Double_t width, Double_t height, Double_t thickness, Int_t LayerId) {
   // Define sublayer thicknesses (in cm)
   // These values mimic the GEANT4 setup:
   Double_t lowerIronThick = 0.3;   // 3 mm
   Double_t fiberMatThick  = 0.135;  // 1.35 mm (each fiber mat)
   Double_t airGap         = 0.1;    // 1 mm
   Double_t upperIronThick = 0.3;    // 3 mm
+  Double_t zLowerIronInt = -3.5/10;
+  Double_t zFiberMat1 = -1.325/10;
+  Double_t zAirGap    = -0.15/10;
+  Double_t zFiberMat2 = 1.025/10;
+  Double_t zUpperIronInt = 3.2/10;
   // Total module thickness = 0.3 + 0.135 + 0.1 + 0.135 + 0.3 ≈ 1.0 cm
 
   // Create the mother volume for the SciFi module
@@ -261,49 +228,53 @@ TGeoVolume* CreateSciFiModule(const char* name, Double_t width, Double_t height,
   TGeoVolume* lowerIronVol = new TGeoVolume(Form("%s_lowerIron", name), lowerIronBox, gGeoManager->GetMedium("iron"));
   lowerIronVol->SetLineColor(kGray+1);
   lowerIronVol->SetTransparency(20);
-  modMotherVol->AddNode(lowerIronVol, 1, new TGeoTranslation(0, 0, -thickness/2 + lowerIronThick/2));
+  modMotherVol->AddNode(lowerIronVol, 1, new TGeoTranslation(0, 0, zLowerIronInt));
 
   // --- Fiber Mat U (Lower SciFi Mat) ---
   TGeoBBox* fiberMatBoxU = new TGeoBBox(Form("%s_fiberMat_U", name), width/2, height/2, fiberMatThick/2);
   TGeoVolume* fiberMatVolU = new TGeoVolume(Form("%s_fiberMat_U", name), fiberMatBoxU, gGeoManager->GetMedium("SciFiMat"));
-  fiberMatVolU->SetLineColor(kYellow);
-  fiberMatVolU->SetTransparency(30);
-  modMotherVol->AddNode(fiberMatVolU, 1, new TGeoTranslation(0, 0, -thickness/2 + lowerIronThick + fiberMatThick/2));
+  // fiberMatVolU->SetLineColor(kYellow);
+  // fiberMatVolU->SetTransparency(30);
+  modMotherVol->AddNode(fiberMatVolU, 1, new TGeoTranslation(0, 0, zFiberMat1));
 
   // --- Fiber Mat V (Upper SciFi Mat) ---
   TGeoBBox* fiberMatBoxV = new TGeoBBox(Form("%s_fiberMat_V", name), width/2, height/2, fiberMatThick/2);
   TGeoVolume* fiberMatVolV = new TGeoVolume(Form("%s_fiberMat_V", name), fiberMatBoxV, gGeoManager->GetMedium("SciFiMat"));
-  fiberMatVolV->SetLineColor(kYellow);
-  fiberMatVolV->SetTransparency(30);
-  modMotherVol->AddNode(fiberMatVolV, 1, new TGeoTranslation(0, 0, -thickness/2 + lowerIronThick + fiberMatThick + airGap + fiberMatThick/2));
+  // fiberMatVolV->SetLineColor(kYellow);
+  // fiberMatVolV->SetTransparency(30);
+  modMotherVol->AddNode(fiberMatVolV, 1, new TGeoTranslation(0, 0, zFiberMat2));
 
   // --- Upper Internal Iron ---
   TGeoBBox* upperIronBox = new TGeoBBox(Form("%s_upperIron", name), width/2, height/2, upperIronThick/2);
   TGeoVolume* upperIronVol = new TGeoVolume(Form("%s_upperIron", name), upperIronBox, gGeoManager->GetMedium("iron"));
   upperIronVol->SetLineColor(kGray+1);
   upperIronVol->SetTransparency(20);
-  modMotherVol->AddNode(upperIronVol, 1, new TGeoTranslation(0, 0, thickness/2 - upperIronThick/2));
+  modMotherVol->AddNode(upperIronVol, 1, new TGeoTranslation(0, 0, zUpperIronInt));
 
   // -----------------------------
   // Now, build the fiber arrays inside each fiber mat.
   // Create a daughter "mother" volume in each fiber mat to hold the fibers.
   TGeoBBox* sciFiLayerMotherUBox = new TGeoBBox(Form("%s_SciFiLayerMother_U", name), width/2, height/2, fiberMatThick/2);
   TGeoVolume* sciFiLayerMotherUVol = new TGeoVolume(Form("%s_SciFiLayerMother_U", name), sciFiLayerMotherUBox, gGeoManager->GetMedium("SciFiMat"));
-  sciFiLayerMotherUVol->SetLineColor(kYellow);
-  sciFiLayerMotherUVol->SetTransparency(30);
+  // sciFiLayerMotherUVol->SetLineColor(kYellow);
+  // sciFiLayerMotherUVol->SetTransparency(100);
+  // Make the mother volume invisible so that only the fibers show up
+  // sciFiLayerMotherUVol->SetVisibility(false);
   fiberMatVolU->AddNode(sciFiLayerMotherUVol, 1, new TGeoTranslation(0, 0, 0));
 
   TGeoBBox* sciFiLayerMotherVBox = new TGeoBBox(Form("%s_SciFiLayerMother_V", name), width/2, height/2, fiberMatThick/2);
   TGeoVolume* sciFiLayerMotherVVol = new TGeoVolume(Form("%s_SciFiLayerMother_V", name), sciFiLayerMotherVBox, gGeoManager->GetMedium("SciFiMat"));
-  sciFiLayerMotherVVol->SetLineColor(kYellow);
-  sciFiLayerMotherVVol->SetTransparency(30);
+  // sciFiLayerMotherVVol->SetLineColor(kYellow);
+  // sciFiLayerMotherVVol->SetTransparency(100);
+  // Also hide this mother volume
+  // sciFiLayerMotherVVol->SetVisibility(false);
   fiberMatVolV->AddNode(sciFiLayerMotherVVol, 1, new TGeoTranslation(0, 0, 0));
 
   // --- Define fiber parameters (in cm) ---
   Double_t fSciFiBendingAngle = 5.0; // degrees
   Double_t radAngle = fSciFiBendingAngle * TMath::DegToRad();
   // Assume that 80% of the module width is active for fibers.
-  Double_t fSciFiActiveAreaX = width * 0.8;
+  Double_t fSciFiActiveAreaX = width - width  *  tan(radAngle);
   // For the fiber length, assume the full height of the fiber mat is active.
   Double_t fSciFiActiveAreaY = height;
   Double_t fiberLength = fSciFiActiveAreaY * cos(radAngle);
@@ -311,47 +282,55 @@ TGeoVolume* CreateSciFiModule(const char* name, Double_t width, Double_t height,
   Double_t layerThickness = fiberMatThick / numFiberLayers; // thickness per fiber layer
   Double_t fFiberRadius = 0.01125; // 0.1125 mm in cm
   Double_t fFiberPitch  = 0.025;    // 0.25 mm in cm
+  Double_t antioverlap = 0.0001;
   Int_t fNumFibers = static_cast<Int_t>(fSciFiActiveAreaX / fFiberPitch);
 
   // --- Create the fiber volume (modeled as a tube) ---
   TGeoTube* fiberTube = new TGeoTube("FiberTube", 0, fFiberRadius, fiberLength/2);
   TGeoVolume* fiberVol = new TGeoVolume("FiberVol", fiberTube, gGeoManager->GetMedium("SciFiMat"));
+  AddSensitiveVolume(fiberVol);
+  // AddSensitiveVolume(modMotherVol);
   fiberVol->SetLineColor(kMagenta);
-  fiberVol->SetTransparency(30);
+  fiberVol->SetTransparency(15);
+  // Ensure fibers are visible
+  fiberVol->SetVisibility(true);
 
   // --- Define rotations for fibers ---
   // For the U fibers: rotate X by 90° then Y by +5°
   TGeoRotation* rotFiberU = new TGeoRotation();
-  rotFiberU->RotateX(90.);
+  // 
   rotFiberU->RotateY(fSciFiBendingAngle);
+  rotFiberU->RotateX(90.);
   // For the V fibers: rotate X by 90° then Y by -5°
   TGeoRotation* rotFiberV = new TGeoRotation();
-  rotFiberV->RotateX(90.);
+  // 
   rotFiberV->RotateY(-fSciFiBendingAngle);
-
+  rotFiberV->RotateX(90.);
   // --- Place fibers in the U fiber mat ---
   for (int layer = 0; layer < numFiberLayers; layer++) {
-    Double_t zCenter = -fiberMatThick/2 + (layer + 0.5) * layerThickness;
+    Double_t zCenter = -fiberMatThick/2 + (layer + 0.5) * (layerThickness + antioverlap);
     for (int j = 0; j < fNumFibers; j++) {
       Double_t xPos = -fSciFiActiveAreaX/2 + (j + 0.5) * fFiberPitch;
       // Create a combined translation+rotation
       TGeoCombiTrans* ctU = new TGeoCombiTrans("", xPos, 0, zCenter, rotFiberU);
-      sciFiLayerMotherUVol->AddNode(fiberVol, layer * fNumFibers + j, ctU);
+      sciFiLayerMotherUVol->AddNode(fiberVol, 1000000000 + LayerId * 10000000 + 0*100000 + layer * 10000 + j, ctU);
     }
   }
 
   // --- Place fibers in the V fiber mat ---
   for (int layer = 0; layer < numFiberLayers; layer++) {
-    Double_t zCenter = -fiberMatThick/2 + (layer + 0.5) * layerThickness;
+    Double_t zCenter = -fiberMatThick/2 + (layer + 0.5) * (layerThickness + antioverlap);
     for (int j = 0; j < fNumFibers; j++) {
       Double_t xPos = -fSciFiActiveAreaX/2 + (j + 0.5) * fFiberPitch;
       TGeoCombiTrans* ctV = new TGeoCombiTrans("", xPos, 0, zCenter, rotFiberV);
-      sciFiLayerMotherVVol->AddNode(fiberVol, layer * fNumFibers + j, ctV);
+      sciFiLayerMotherVVol->AddNode(fiberVol, 1000000000 + LayerId * 10000000 + 1*100000 + layer * 10000 + j, ctV);
     }
   }
-
   return modMotherVol;
 }
+
+
+
 
 void MTCDetector::ConstructGeometry() {
     // Initialize media (using FairROOT’s interface)
@@ -361,6 +340,8 @@ void MTCDetector::ConstructGeometry() {
     TGeoMedium* ironMed  = gGeoManager->GetMedium("iron");
     // For the scintillator, you may use the same medium as SciFiMat or another if defined.
     TGeoMedium* scintMed = gGeoManager->GetMedium("SciFiMat"); 
+    gGeoManager->SetVisLevel(4);
+    gGeoManager->SetTopVisible();
   
     // Define the module spacing based on three sublayers:
     //   fIronThick (outer iron), fSciFiThick (SciFi module/fiber module), fScintThick (scintillator)
@@ -380,28 +361,45 @@ void MTCDetector::ConstructGeometry() {
     ironVol->SetTransparency(20);
     // (Optional: attach a magnetic field with TGeoUniformMagField if needed)
   
-    // --- SciFi Module ---
-    TGeoVolume* sciFiModuleVol = CreateSciFiModule("MTC_sciFi", fWidth, fHeight, fSciFiThick);
+    // // --- SciFi Module ---
+    // TGeoVolume* sciFiModuleVol = CreateSciFiModule("MTC_sciFi", fWidth, fHeight, fSciFiThick);
   
     // --- Scintillator Layer (blue) ---
     TGeoVolume* scintVol = CreateSegmentedLayer("MTC_scint", fWidth, fHeight,
                                                 fScintThick, 1.0, 1.0,
                                                 scintMed, kAzure+7, 30);
   
-    // --- Assemble the layers into the envelope ---
-    for (Int_t i = 0; i < fLayers; i++) {
-      // Compute the center position (z) for the current module
-      Double_t zPos = -totalLength/2 + (i+0.5) * moduleSpacing;
-      // Place the Outer Iron layer (shifted down by half the SciFi+scint thickness)
-      envVol->AddNode(ironVol, i, new TGeoTranslation(0, 0, zPos - (fSciFiThick + fScintThick)/2));
-      // Place the SciFi module (fiber module)
-      envVol->AddNode(sciFiModuleVol, i, new TGeoTranslation(0, 0, zPos - fScintThick/2));
-      // Place the Scintillator layer (shifted up by half the iron thickness)
-      envVol->AddNode(scintVol, i, new TGeoTranslation(0, 0, zPos + fIronThick/2));
-    }
+    // // --- Assemble the layers into the envelope ---
+    // for (Int_t i = 0; i < fLayers; i++) {
+    //   // Compute the center position (z) for the current module
+    //   Double_t zPos = -totalLength/2 + (i+0.5) * moduleSpacing;
+    //   // Place the Outer Iron layer (shifted down by half the SciFi+scint thickness)
+    //   envVol->AddNode(ironVol, i, new TGeoTranslation(0, 0, zPos - (fSciFiThick + fScintThick)/2));
+    //   // Place the SciFi module (fiber module)
+    //   envVol->AddNode(sciFiModuleVol, i, new TGeoTranslation(0, 0, zPos - fScintThick/2));
+    //   // Place the Scintillator layer (shifted up by half the iron thickness)
+    //   envVol->AddNode(scintVol, i, new TGeoTranslation(0, 0, zPos + fIronThick/2));
+
+
+      // --- Assemble the layers into the envelope ---
+  for (Int_t i = 0; i < fLayers; i++) {
+    // Compute the center position (z) for the current module
+    Double_t zPos = -totalLength/2 + (i+0.5) * moduleSpacing;
+    
+    // Place the Outer Iron layer (shifted down by half the SciFi+scint thickness)
+    envVol->AddNode(ironVol, i, new TGeoTranslation(0, 0, zPos - (fSciFiThick + fScintThick)/2));
+    
+    // Create a SciFi module with the current detector id 'i'
+    TGeoVolume* sciFiModuleVol = CreateSciFiModule("MTC_sciFi", fWidth, fHeight, fSciFiThick, i);
+    envVol->AddNode(sciFiModuleVol, i, new TGeoTranslation(0, 0, zPos - fScintThick/2));
+    
+    // Place the Scintillator layer (shifted up by half the iron thickness)
+    envVol->AddNode(scintVol, i, new TGeoTranslation(0, 0, zPos + fIronThick/2));
+  }
   
     // Finally, add the envelope to the top volume with the global z offset fZCenter
     gGeoManager->GetTopVolume()->AddNode(envVol, 1, new TGeoTranslation(0, 0, fZCenter));
+
 }
 // Standard FairDetector methods
 void MTCDetector::Initialize() { FairDetector::Initialize(); }
