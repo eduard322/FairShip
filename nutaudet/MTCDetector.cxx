@@ -46,9 +46,9 @@ using std::endl;
 using namespace ShipUnit;
 
 
-TGeoVolume* CreateSegmentedLayer(const char* name, Double_t width, Double_t height,
+TGeoVolume* MTCDetector::CreateSegmentedLayer(const char* name, Double_t width, Double_t height,
                                 Double_t thickness, Double_t cellSizeX, Double_t cellSizeY,
-                                TGeoMedium* material, Int_t color, Double_t transparency) {
+                                TGeoMedium* material, Int_t color, Double_t transparency, Int_t LayerId) {
     TGeoBBox* mother = new TGeoBBox(Form("%s_mother", name), width/2, height/2, thickness/2);
     TGeoVolume* motherVol = new TGeoVolume(Form("%s_mother", name), mother, material);
     motherVol->SetLineColor(color);
@@ -66,7 +66,8 @@ TGeoVolume* CreateSegmentedLayer(const char* name, Double_t width, Double_t heig
         for(Int_t j=0; j<nY; j++) {
             Double_t x = -width/2 + cellSizeX*(i+0.5);
             Double_t y = -height/2 + cellSizeY*(j+0.5);
-            motherVol->AddNode(cellVol, i*nY+j, new TGeoTranslation(x, y, 0));
+            motherVol->AddNode(cellVol, 2000000000 + LayerId * 10000000 + 1*100000 + i*nY+j, new TGeoTranslation(x, y, 0));
+            cout << "Define Scint cell: " << 2000000000 + LayerId * 10000000 + 1*100000 + i*nY+j << "  " << LayerId << "  " << i*nY+j << endl;
         }
     }
     return motherVol;
@@ -203,7 +204,7 @@ void MTCDetector::SetMTCParameters(Double_t w, Double_t h, Double_t iron,
 
 
 // Updated SciFi module builder with fiber placements
-TGeoVolume* CreateSciFiModule(const char* name, Double_t width, Double_t height, Double_t thickness, Int_t LayerId) {
+TGeoVolume* MTCDetector::CreateSciFiModule(const char* name, Double_t width, Double_t height, Double_t thickness, Int_t LayerId) {
   // Define sublayer thicknesses (in cm)
   // These values mimic the GEANT4 setup:
   Double_t lowerIronThick = 0.3;   // 3 mm
@@ -314,6 +315,7 @@ TGeoVolume* CreateSciFiModule(const char* name, Double_t width, Double_t height,
       // Create a combined translation+rotation
       TGeoCombiTrans* ctU = new TGeoCombiTrans("", xPos, 0, zCenter, rotFiberU);
       sciFiLayerMotherUVol->AddNode(fiberVol, 1000000000 + LayerId * 10000000 + 0*100000 + layer * 10000 + j, ctU);
+      cout << "Define Scifi Fibre: " << 1000000000 + LayerId * 10000000 + 0*100000 + layer * 10000 + j << "  " << LayerId << "  " << 0 << "   " << layer << "  " << j << endl;
     }
   }
 
@@ -324,6 +326,7 @@ TGeoVolume* CreateSciFiModule(const char* name, Double_t width, Double_t height,
       Double_t xPos = -fSciFiActiveAreaX/2 + (j + 0.5) * fFiberPitch;
       TGeoCombiTrans* ctV = new TGeoCombiTrans("", xPos, 0, zCenter, rotFiberV);
       sciFiLayerMotherVVol->AddNode(fiberVol, 1000000000 + LayerId * 10000000 + 1*100000 + layer * 10000 + j, ctV);
+      cout << "Define Scifi Fibre: " << 1000000000 + LayerId * 10000000 + 0*100000 + layer * 10000 + j << "  " << LayerId << "  " << 1 << "   " << layer << "  " << j << endl;
     }
   }
   return modMotherVol;
@@ -365,9 +368,7 @@ void MTCDetector::ConstructGeometry() {
     // TGeoVolume* sciFiModuleVol = CreateSciFiModule("MTC_sciFi", fWidth, fHeight, fSciFiThick);
   
     // --- Scintillator Layer (blue) ---
-    TGeoVolume* scintVol = CreateSegmentedLayer("MTC_scint", fWidth, fHeight,
-                                                fScintThick, 1.0, 1.0,
-                                                scintMed, kAzure+7, 30);
+
   
     // // --- Assemble the layers into the envelope ---
     // for (Int_t i = 0; i < fLayers; i++) {
@@ -392,7 +393,9 @@ void MTCDetector::ConstructGeometry() {
     // Create a SciFi module with the current detector id 'i'
     TGeoVolume* sciFiModuleVol = CreateSciFiModule("MTC_sciFi", fWidth, fHeight, fSciFiThick, i);
     envVol->AddNode(sciFiModuleVol, i, new TGeoTranslation(0, 0, zPos - fScintThick/2));
-    
+    TGeoVolume* scintVol = CreateSegmentedLayer("MTC_scint", fWidth, fHeight,
+      fScintThick, 1.0, 1.0,
+      scintMed, kAzure+7, 30, i);
     // Place the Scintillator layer (shifted up by half the iron thickness)
     envVol->AddNode(scintVol, i, new TGeoTranslation(0, 0, zPos + fIronThick/2));
   }
@@ -428,7 +431,7 @@ Bool_t  MTCDetector::ProcessHits(FairVolume* vol)
 
        TParticle* p = gMC->GetStack()->GetCurrentTrack();
        Int_t pdgCode = p->GetPdgCode();
-      Int_t detID;
+      Long_t detID;
       gMC->CurrentVolID(detID);
       TLorentzVector Pos;
       gMC->TrackPosition(Pos);
@@ -470,7 +473,7 @@ void MTCDetector::Register(){
     fMTCDetectorPointCollection->Clear();
   }
   
-  MTCdetPoint* MTCDetector::AddHit(Int_t trackID, Int_t detID,
+  MTCdetPoint* MTCDetector::AddHit(Int_t trackID, Long_t detID,
   TVector3 pos, TVector3 mom,
   Double_t time, Double_t length,
   Double_t eLoss, Int_t pdgCode)

@@ -14,7 +14,8 @@
 #include "TLorentzVector.h"
 
 class MTCdetPoint;
-class FairModule;
+class TGeoVolume;
+class TGeoMedium;
 class FairVolume;
 class TClonesArray;
 
@@ -26,14 +27,17 @@ public:
     void SetMTCParameters(Double_t width, Double_t height,
                          Double_t ironThick, Double_t sciFiThick, Double_t scintThick,
                          Int_t nLayers, Double_t zCenter, Double_t fieldY);
-
+    TGeoVolume* CreateSegmentedLayer(const char* name, Double_t width, Double_t height,
+                            Double_t thickness, Double_t cellSizeX, Double_t cellSizeY,
+                            TGeoMedium* material, Int_t color, Double_t transparency, Int_t LayerId);
     virtual void ConstructGeometry();
     virtual void Initialize();
     virtual Bool_t ProcessHits(FairVolume* vol = 0);
-    MTCdetPoint* AddHit(Int_t trackID, Int_t detID,
+    MTCdetPoint* AddHit(Int_t trackID, Long_t detID,
         TVector3 pos, TVector3 mom,
         Double_t time, Double_t length,
         Double_t eLoss, Int_t pdgCode);
+    TGeoVolume* CreateSciFiModule(const char* name, Double_t width, Double_t height, Double_t thickness, Int_t LayerId);
     virtual void Register();
     virtual TClonesArray* GetCollection(Int_t iColl) const;
     virtual void Reset();
@@ -45,7 +49,7 @@ private:
      */
      Int_t          fTrackID;           //!  track index
      Int_t          fPdgCode;           //!  pdg code
-     Int_t          fVolumeID;          //!  volume id
+     Long_t          fVolumeID;          //!  volume id
      TLorentzVector fPos;               //!  position at entrance
      TLorentzVector fMom;               //!  momentum at entrance
      Double32_t     fTime;              //!  time
