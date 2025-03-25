@@ -72,7 +72,7 @@ with ConfigRegistry.register_config("basic") as c:
         width=50 * u.cm,          # Active area width
         height=50 * u.cm,         # Active area height
         ironThick=5 * u.cm,       # Magnetised iron thickness
-        sciFiThick=1.0 * u.cm,    # SciFi layer thickness
+        sciFiThick=0.97 * u.cm,    # SciFi layer thickness
         scintThick=1.5 * u.cm,      # Scintillator layer thickness
         nLayers=45,               # Number of sandwich layers
         zPosition=-3343.64 * u.cm,   # Global z position

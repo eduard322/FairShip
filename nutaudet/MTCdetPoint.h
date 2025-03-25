@@ -38,8 +38,9 @@ class MTCdetPoint : public FairMCPoint
     virtual void Print(const Option_t* opt) const;
     Int_t PdgCode() const {return fPdgCode;}
 
-
-  private:
+    Int_t GetLayer();
+    
+    Int_t GetLayerType();
     /** Copy constructor **/
     Int_t fPdgCode;
 
