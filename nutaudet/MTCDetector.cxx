@@ -259,7 +259,7 @@ TGeoVolume* MTCDetector::CreateSciFiModule(const char* name, Double_t width, Dou
   // -----------------------------
   // Now, build the fiber arrays inside each fiber mat.
   // Create a daughter "mother" volume in each fiber mat to hold the fibers.
-  Int_t fiber_layer_number = 6;
+  Int_t fiber_layer_number = 1;
   TGeoBBox* sciFiLayerMotherUBox = new TGeoBBox(Form("%s_SciFiLayerMother_U", name), width/2, height/2, fiberMatThick/2 / fiber_layer_number);
   TGeoVolume* sciFiLayerMotherUVol = new TGeoVolume(Form("%s_SciFiLayerMother_U", name), sciFiLayerMotherUBox, gGeoManager->GetMedium("SciFiMat"));
   AddSensitiveVolume(sciFiLayerMotherUVol);
@@ -438,6 +438,7 @@ Bool_t  MTCDetector::ProcessHits(FairVolume* vol)
        if (fELoss == 0. ) { return kFALSE; } // if you do not want hits with zero eloss
 
        TParticle* p = gMC->GetStack()->GetCurrentTrack();
+       fTrackID  = gMC->GetStack()->GetCurrentTrackNumber();
        Int_t pdgCode = p->GetPdgCode();
       Int_t detID;
       gMC->CurrentVolID(detID);
