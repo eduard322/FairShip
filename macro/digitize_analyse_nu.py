@@ -4,6 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm  # Import LogNorm for log scale colorbars
 import seaborn as sns
+import argparse
 sns.set_style("whitegrid")
 
 
@@ -32,22 +33,22 @@ class FairShipAnalyzer:
             print(i, len(event.MTCdetPoint))
 
 
-    def set_fiber_dimensions(self, detector_dimensions, fiber_dimensions):
+    def set_fiber_dimensions(self, detector_properties, fiber_dimensions):
         self.fiber_dimensions = fiber_dimensions
-        self.detector_dimensions = detector_dimensions
-        self.detector_dimensions["angle"] = np.radians(self.detector_dimensions["angle"])
-        self.detector_dimensions["width"] = self.detector_dimensions["width"] - self.detector_dimensions["width"] * np.tan(self.detector_dimensions["angle"])
-        self.fiber_dimensions["fiber_length"] = self.detector_dimensions["height"] * np.cos(self.detector_dimensions["angle"])
+        self.detector_properties = detector_properties
+        self.detector_properties["angle"] = np.radians(self.detector_properties["angle"])
+        self.detector_properties["width"] = self.detector_properties["width"] - self.detector_properties["width"] * np.tan(self.detector_properties["angle"])
+        self.fiber_dimensions["fiber_length"] = self.detector_properties["height"] * np.cos(self.detector_properties["angle"])
 
     def get_local_fiber_id(self, hit):
         # Retrieve the detector tilt angle (in radians)
-        angle = self.detector_dimensions["angle"] if hit.GetLayerType() == 1 else -self.detector_dimensions["angle"]
+        angle = self.detector_properties["angle"] if hit.GetLayerType() == 1 else -self.detector_properties["angle"]
         # Project the hit position (x, y) onto the fiber pitch direction.
         # This gives the effective coordinate across the fibers.
         local_u = hit.GetX() * np.cos(angle) + hit.GetY() * np.sin(angle)
         
         # Create segments along the projected width using fiber pitch
-        plane_segments = np.arange(-self.detector_dimensions["width"]/(2*np.cos(angle)), self.detector_dimensions["width"]/(2*np.cos(angle)), self.fiber_dimensions["fiber_pitch"])
+        plane_segments = np.arange(-self.detector_properties["width"]/(2*np.cos(angle)), self.detector_properties["width"]/(2*np.cos(angle)), self.fiber_dimensions["fiber_pitch"])
         self.number_of_fibers = len(plane_segments)
         # Identify the fiber index corresponding to the projected hit position
         fiber_id = np.digitize(local_u, plane_segments) - 1
@@ -90,7 +91,7 @@ class FairShipAnalyzer:
         
         # Solve for (x, y)
         x, y = np.linalg.solve(A, b)
-        if np.abs(x) < self.detector_dimensions["width"] / 2.0 and np.abs(y) < self.detector_dimensions["height"] / 2.0:
+        if np.abs(x) < self.detector_properties["width"] / 2.0 and np.abs(y) < self.detector_properties["height"] / 2.0:
             return (x, y)
         else:
             return None
@@ -111,8 +112,8 @@ class FairShipAnalyzer:
             x_data = df_event["z"]
             x_label = "Z [cm]"
             # Create 100 bins between the start and end of the detector in Z.
-            bins_x = np.linspace(self.detector_dimensions["startZ"],
-                                self.detector_dimensions["endZ"], 100)
+            bins_x = np.linspace(self.detector_properties["startZ"],
+                                self.detector_properties["endZ"], 100)
         elif coord == "layer":
             # Here we assume that the dataframe has a 'layer' column.
             x_data = df_event["layer_id"]
@@ -123,10 +124,10 @@ class FairShipAnalyzer:
             raise ValueError("coord must be either 'z' or 'layer'")
 
         # Define bins for the second coordinate in each plot
-        bins_1 = (bins_x, np.linspace(-self.detector_dimensions["width"]/2,
-                                        self.detector_dimensions["width"]/2, 100))
-        bins_2 = (bins_x, np.linspace(-self.detector_dimensions["height"]/2,
-                                        self.detector_dimensions["height"]/2, 100))
+        bins_1 = (bins_x, np.linspace(-self.detector_properties["width"]/2,
+                                        self.detector_properties["width"]/2, 100))
+        bins_2 = (bins_x, np.linspace(-self.detector_properties["height"]/2,
+                                        self.detector_properties["height"]/2, 100))
 
         # Plot Z(or layer)-X projection.
         ax[0].hist2d(x_data, df_event["x"], bins=bins_1, norm=LogNorm(), cmap="viridis")
@@ -141,7 +142,7 @@ class FairShipAnalyzer:
         ax[1].set_ylabel("Y [cm]")
 
         # Debug print to show the range in Z from the complete dataset
-        print(self.df_digi["z"].min(), self.df_digi["z"].max())
+        # print(self.df_digi["z"].min(), self.df_digi["z"].max())
         fig.savefig(f"event_display_{coord}.png")
 
     def event_display_digi(self, event_id):
@@ -254,8 +255,8 @@ class FairShipAnalyzer:
             Map a real x coordinate to a fiber id.
             Uses the same procedure as get_local_fiber_id.
             """
-            angle = self.detector_dimensions["angle"]
-            width = self.detector_dimensions["width"]
+            angle = self.detector_properties["angle"]
+            width = self.detector_properties["width"]
             fiber_pitch = self.fiber_dimensions["fiber_pitch"]
             segments = np.arange(-width/(2*np.cos(angle)),
                                 width/(2*np.cos(angle)),
@@ -294,10 +295,10 @@ class FairShipAnalyzer:
 
         # Common detector parameters
         total_sciFi_layers = 45 * 2  # 90 layers for SciFi digitization
-        startZ = self.detector_dimensions["startZ"]
-        endZ = self.detector_dimensions["endZ"]
-        width = self.detector_dimensions["width"]
-        angle = self.detector_dimensions["angle"]
+        startZ = self.detector_properties["startZ"]
+        endZ = self.detector_properties["endZ"]
+        width = self.detector_properties["width"]
+        angle = self.detector_properties["angle"]
         fiber_pitch = self.fiber_dimensions["fiber_pitch"]
 
         # Determine figure layout based on chosen coordinate system(s)
@@ -325,7 +326,7 @@ class FairShipAnalyzer:
             # --- SciFi (layer_type 1 or 2) digitized ---
             df_12 = df_event[df_event["layer_type"].isin([1, 2])]
             bins_x1 = np.arange(-0.5, total_sciFi_layers + 0.5, 1.0)
-            bins_y1 = np.linspace(0, self.number_of_fibers, self.number_of_fibers + 1)
+            bins_y1 = np.arange(0, self.number_of_fibers + 2)
             if plot_type == "hist2d":
                 ax_digi_scifi.hist2d(df_12["layer_id"], df_12["fiber_id_local"],
                                     bins=[bins_x1, bins_y1],
@@ -364,7 +365,7 @@ class FairShipAnalyzer:
 
 
             bins_x2 = np.arange(-0.5, total_sciFi_layers + 0.5, 1.0)  # assume 45 layers
-            bins_y2 = np.linspace(0, 2500, 101)
+            bins_y2 = np.arange(0, 2500 + 2)
             if plot_type == "hist2d":
                 ax_digi_scint.hist2d(df_3["layer_id"], df_3["fiber_id_local"],
                                     bins=[bins_x2, bins_y2],
@@ -387,8 +388,8 @@ class FairShipAnalyzer:
             df_12 = df_event[df_event["layer_type"].isin([1, 2])].copy()
             df_12["x_real"] = df_12["x"]
             df_12["z_real"] = df_12["z"]
-            bins_x1 = np.linspace(self.detector_dimensions["startZ"], self.detector_dimensions["endZ"], 100)
-            bins_y1 = np.linspace(-self.detector_dimensions["width"]/2, self.detector_dimensions["width"]/2, 100)
+            bins_x1 = np.linspace(self.detector_properties["startZ"], self.detector_properties["endZ"], 100)
+            bins_y1 = np.linspace(-self.detector_properties["width"]/2, self.detector_properties["width"]/2, 100)
             if plot_type == "hist2d":
                 # Using 50 bins (adjust as needed)
                 ax_zx_scifi.hist2d(df_12["z_real"], df_12["x_real"],
@@ -442,7 +443,7 @@ class FairShipAnalyzer:
                                 f"E_nu = {df_event['E_nu'].iloc[0]:.2f} [GeV]")
 
         plt.tight_layout()
-        fig.savefig("event_display_digi_new.pdf")
+        fig.savefig(f"event_display_digi_{event_id}_{plot_type}_{plot_coords}.pdf")
 
     def create_fiber_structure(self):
         df_digi = {"event_id": [], "multiplicity": [], "track_id": [], "E_nu": [], "px_nu": [], "pz_nu": [], "x_nu": [], "z_nu": [], "pdg_nu": [], "fiber_id": [], "fiber_id_local": [], "layer_type": [], "layer_id": [], "x": [], "y": [], "z": [], "pdg": [], "Eloss": []}
@@ -458,7 +459,7 @@ class FairShipAnalyzer:
                 if hit.GetLayerType() < 3:
                     fiber_id = self.get_global_fiber_id(hit)
                     fiber_id_local = self.get_local_fiber_id(hit)
-                    if hit.GetEnergyLoss()*1e6 < 180:
+                    if hit.GetEnergyLoss()*1e6 < self.detector_properties["Eloss_threshold"]:
                         continue
                     # fiber_id_local = fiber_id_local + self.number_of_fibers if hit.GetLayerType() == 2 else fiber_id_local
                 else:
@@ -477,7 +478,6 @@ class FairShipAnalyzer:
                 df_digi["fiber_id"].append(fiber_id)
                 df_digi["layer_type"].append(hit.GetLayerType())
                 df_digi["fiber_id_local"].append(fiber_id_local)
-                # df_digi["layer_id"].append(hit.GetLayer())
                 if  hit.GetLayerType() == 3:
                     df_digi["layer_id"].append(hit.GetLayer() * 2 + 3)
                 else:
@@ -494,27 +494,46 @@ class FairShipAnalyzer:
 
 
 
-fileName = "ship.conical.Genie-TGeant4.root"
-fiber_dimensions = {
-    "fiber_pitch": 0.1,
+def main():
+    parser = argparse.ArgumentParser(description="Analyze FairShip data")
+    parser.add_argument("--file", type=str, default="ship.conical.Genie-TGeant4.root", help="Input ROOT file")
+    parser.add_argument("--fiber_pitch", type=float, default=0.1, help="Fiber pitch")
+    parser.add_argument("--width", type=float, default=50, help="Detector width")
+    parser.add_argument("--height", type=float, default=50, help="Detector height")
+    parser.add_argument("--startZ", type=float, default=-3511.7150, help="Start Z coordinate")
+    parser.add_argument("--endZ", type=float, default=-3175.5650, help="End Z coordinate")
+    parser.add_argument("--angle", type=float, default=5, help="Detector tilt angle")
+    parser.add_argument("--Eloss_threshold", type=float, default=180, help="Energy loss threshold")
+    parser.add_argument("--event_id", type=int, default=22, help="Event ID to display")
+    parser.add_argument("--plot_type", type=str, default="hist2d", choices=["hist2d", "scatter"], help="Type of plot")
+    parser.add_argument("--plot_coords", type=str, default="both", choices=["digi", "zx", "both"], help="Coordinate system(s) to plot")
+
+    args = parser.parse_args()
+
+    fiber_dimensions = {
+        "fiber_pitch": args.fiber_pitch,
     }
-detector_dimensions = {
-    "width": 50,
-    "height": 50,
-    "startZ": -3511.7150,
-    "endZ":  -3175.5650,
-    "angle": 5
-}
+    detector_properties = {
+        "width": args.width,
+        "height": args.height,
+        "startZ": args.startZ,
+        "endZ": args.endZ,
+        "angle": args.angle,
+        "Eloss_threshold": args.Eloss_threshold
+    }
 
-analyzer = FairShipAnalyzer(fileName)
-analyzer.set_fiber_dimensions(detector_dimensions, fiber_dimensions)
+    analyzer = FairShipAnalyzer(args.file)
+    analyzer.set_fiber_dimensions(detector_properties, fiber_dimensions)
 
-print(analyzer.get_entries())
-print(analyzer.get_branches())
-analyzer.create_fiber_structure()
-analyzer.analyze_events()
-# analyzer.event_display(22, coord = "layer")
-analyzer.event_display_digi_new(22, "hist2d")
+    print(analyzer.get_entries())
+    print(analyzer.get_branches())
+    analyzer.create_fiber_structure()
+    # analyzer.analyze_events()
+    print(args.event_id)
+    analyzer.event_display_digi_new(args.event_id, args.plot_type, args.plot_coords)
+
+if __name__ == "__main__":
+    main()
 
 
 
