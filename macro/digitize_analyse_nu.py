@@ -3,18 +3,21 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm  # Import LogNorm for log scale colorbars
+from mpl_toolkits.mplot3d import Axes3D  # Needed for 3D plotting
 import seaborn as sns
 import argparse
+import uproot
 sns.set_style("whitegrid")
 
 
 
 class FairShipAnalyzer:
-    def __init__(self, file_list):
+    def __init__(self, file_list, detector_properties, fiber_dimensions):
         if isinstance(file_list, str):
             file_list = [file_list]
         self.file_list = file_list
         self.chain = self._create_chain()
+        self.set_fiber_dimensions(detector_properties, fiber_dimensions)
 
     def _create_chain(self):
         ch = r.TChain('cbmsim')
@@ -29,9 +32,12 @@ class FairShipAnalyzer:
         return self.chain.GetListOfBranches()
 
     def analyze_events(self):
+        zero_events = 0
         for i, event in enumerate(self.chain):
+            if len(event.MTCdetPoint) == 0:
+                zero_events += 1
             print(i, len(event.MTCdetPoint))
-
+        print(f"Number of events with no hits: {zero_events} out of {self.get_entries()}")
 
     def set_fiber_dimensions(self, detector_properties, fiber_dimensions):
         self.fiber_dimensions = fiber_dimensions
@@ -216,34 +222,39 @@ class FairShipAnalyzer:
 
 
 
-    def event_display_digi_new(self, event_id, plot_type="hist2d", plot_coords="both"):
+    def event_display_digi_new(self, event_id, plot_type="hist2d", plot_coords="digi"):
         """
-        Display an event using subplots in one or two coordinate systems.
+        Display an event using subplots in one or two coordinate systems, with an optional 3D view.
 
-        Two coordinate systems are supported:
+        Four display options are supported:
         - "digi": The digitized coordinate system.
             • SciFi (layer_type 1 or 2): 2D histogram (or scatter) of fiber_id_local (Y) vs. layer_id (X).
             • Scintillator (layer_type 3): 2D histogram (or scatter) of fiber_id_local (Y) vs. layer_id (X),
-                with the histogram weighted by energy loss.
-            • An arrow (with label) is drawn on the SciFi plot showing the neutrino’s incoming direction
-                (using mapping functions to go from real coordinates to digitized ones).
-
+            with the histogram weighted by energy loss.
+            • A neutrino arrow is drawn on the SciFi plot.
         - "zx": The physical (real) coordinate system (Z vs. X).
-            • For SciFi, the digitized fiber_id_local is converted back into a real x coordinate.
-                The layer_id is inverted to a real z coordinate assuming a linear mapping.
-            • For Scintillator, an assumed mapping converts the cell ID (fiber_id_local) into a real x value,
-                and the layer_id into z.
-            • The neutrino arrow is drawn at (x_nu, z_nu), with its tail computed from the momentum.
-
-        - "both": Both coordinate systems are displayed in one canvas arranged in two rows.
-            The top row is the digitized view and the bottom row is the Z–X view.
+            • For SciFi, digitized fiber_id_local is converted back into a real x coordinate and layer_id
+            is mapped to a real z.
+            • For Scintillator, a similar mapping is assumed.
+            • The neutrino arrow is drawn using the real neutrino coordinates.
+        - "both": Both coordinate systems are shown in a 2×2 canvas.
+        - "3d": A canvas with two rows is created.
+            The top row is as in the "digi" display (2D digitized SciFi and Scintillator views).
+            The second row is a 3D scatter plot of the event where:
+                • x-axis: real Z (from df["z"])
+                • y-axis: real X (from df["x"])
+                • z-axis: an estimated fiber position computed as (fiber_id_local * fiber_pitch + fiber_pitch/2)
+            The neutrino arrow is drawn using matplotlib’s 3D quiver (with no third-component of momentum).
 
         Parameters:
-        event_id (int): ID of the event to display.
-        plot_type (str): Either "hist2d" or "scatter" for the type of plot.
-        plot_coords (str): Which coordinate system(s) to plot: "digi", "zx", or "both".
+            event_id (int): ID of the event to display.
+            plot_type (str): Either "hist2d" or "scatter" for the type of plot.
+            plot_coords (str): Which coordinate system(s) to plot: "digi", "zx", "both", or "3d".
         """
 
+        import matplotlib.pyplot as plt
+        from matplotlib.colors import LogNorm
+        import numpy as np
 
         # --- Helper mapping functions for digitized coordinates (already provided) ---
         def map_z_to_layer(z, startZ, endZ, total_layers):
@@ -282,14 +293,14 @@ class FairShipAnalyzer:
             else:
                 return f"PDG {pdg}"
 
-
-
         # --- Retrieve the event data ---
         df_event = self.df_digi[self.df_digi["event_id"] == event_id]
         # For annotation, get neutrino parameters once.
         x_nu = df_event["x_nu"].iloc[0]
+        y_nu = df_event["y_nu"].iloc[0]
         z_nu = df_event["z_nu"].iloc[0]
         px_nu = df_event["px_nu"].iloc[0]
+        py_nu = df_event["py_nu"].iloc[0]
         pz_nu = df_event["pz_nu"].iloc[0]
         particle_name = particle_map(df_event["pdg_nu"].iloc[0])
 
@@ -308,7 +319,16 @@ class FairShipAnalyzer:
             ax_digi_scint = ax[0, 1]
             ax_zx_scifi = ax[1, 0]
             ax_zx_scint = ax[1, 1]
-        else:
+        elif plot_coords == "3d":
+            from matplotlib.gridspec import GridSpec
+            fig = plt.figure(figsize=(12, 12), dpi=100)
+            gs = GridSpec(2, 2, height_ratios=[1, 1])
+            # Top row: digitized views (SciFi and Scintillator)
+            ax_digi_scifi = fig.add_subplot(gs[0, 0])
+            ax_digi_scint = fig.add_subplot(gs[0, 1])
+            # Second row: 3D display spanning both columns.
+            ax_3d = fig.add_subplot(gs[1, :], projection='3d')
+        elif plot_coords in ["digi", "zx"]:
             fig, ax = plt.subplots(1, 2, figsize=(12, 6), dpi=100)
             if plot_coords == "digi":
                 ax_digi_scifi = ax[0]
@@ -316,21 +336,22 @@ class FairShipAnalyzer:
             elif plot_coords == "zx":
                 ax_zx_scifi = ax[0]
                 ax_zx_scint = ax[1]
-            else:
-                raise ValueError("plot_coords must be 'digi', 'zx', or 'both'")
+        else:
+            raise ValueError("plot_coords must be 'digi', 'zx', 'both', or '3d'")
 
         # -------------------------
         # Plot the Digitized Coordinates if requested
         # -------------------------
-        if plot_coords in ["digi", "both"]:
+        if plot_coords in ["digi", "both", "3d"]:
             # --- SciFi (layer_type 1 or 2) digitized ---
             df_12 = df_event[df_event["layer_type"].isin([1, 2])]
             bins_x1 = np.arange(-0.5, total_sciFi_layers + 0.5, 1.0)
             bins_y1 = np.arange(0, self.number_of_fibers + 2)
             if plot_type == "hist2d":
-                ax_digi_scifi.hist2d(df_12["layer_id"], df_12["fiber_id_local"],
-                                    bins=[bins_x1, bins_y1],
-                                    norm=LogNorm(), cmap=plt.cm.jet)
+                h = ax_digi_scifi.hist2d(df_12["layer_id"], df_12["fiber_id_local"],
+                                        bins=[bins_x1, bins_y1],
+                                        norm=LogNorm(), cmap=plt.cm.jet)
+                print("scifi: ", h[0].shape)
             elif plot_type == "scatter":
                 ax_digi_scifi.scatter(df_12["layer_id"], df_12["fiber_id_local"],
                                     color="blue", marker="o", label="SciFi", alpha=0.7)
@@ -344,7 +365,6 @@ class FairShipAnalyzer:
             # --- Draw the neutrino arrow on the SciFi digitized plot ---
             tip_layer = map_z_to_layer(z_nu, startZ, endZ, total_sciFi_layers)
             tip_fiber = map_x_to_fiber(x_nu) + 0.5  # center of fiber bin
-            # Conversion factors for digitized coordinates.
             d_layer_per_dz = total_sciFi_layers / (endZ - startZ)
             d_fiber_per_dx = 1 / fiber_pitch
             scale = 1  # adjust as needed for visual clarity
@@ -362,14 +382,15 @@ class FairShipAnalyzer:
 
             # --- Scintillator (layer_type 3) digitized ---
             df_3 = df_event[df_event["layer_type"] == 3]
-
-
-            bins_x2 = np.arange(-0.5, total_sciFi_layers + 0.5, 1.0)  # assume 45 layers
-            bins_y2 = np.arange(0, 2500 + 2)
+            bins_x2 = np.arange(-0.5, total_sciFi_layers + 0.5, 1.0)
+            bins_y2 = np.arange(0, 2500 + 1)
             if plot_type == "hist2d":
-                ax_digi_scint.hist2d(df_3["layer_id"], df_3["fiber_id_local"],
-                                    bins=[bins_x2, bins_y2],
-                                    norm=LogNorm(), weights=df_3["Eloss"], cmap=plt.cm.jet)
+                h = ax_digi_scint.hist2d(df_3["layer_id"], df_3["fiber_id_local"],
+                                        bins=[bins_x2, bins_y2],
+                                        norm=LogNorm(), 
+                                        # weights=df_3["Eloss"], 
+                                        cmap=plt.cm.jet)
+                print("scint: ", h[0].shape)
             elif plot_type == "scatter":
                 ax_digi_scint.scatter(df_3["layer_id"], df_3["fiber_id_local"],
                                     c=df_3["Eloss"], norm=LogNorm(), cmap=plt.cm.jet,
@@ -384,16 +405,14 @@ class FairShipAnalyzer:
         # -------------------------
         if plot_coords in ["zx", "both"]:
             # --- SciFi in real coordinates ---
-            # For SciFi hits, convert digitized fiber_id_local back to real x and layer_id to real z.
             df_12 = df_event[df_event["layer_type"].isin([1, 2])].copy()
             df_12["x_real"] = df_12["x"]
             df_12["z_real"] = df_12["z"]
             bins_x1 = np.linspace(self.detector_properties["startZ"], self.detector_properties["endZ"], 100)
             bins_y1 = np.linspace(-self.detector_properties["width"]/2, self.detector_properties["width"]/2, 100)
             if plot_type == "hist2d":
-                # Using 50 bins (adjust as needed)
                 ax_zx_scifi.hist2d(df_12["z_real"], df_12["x_real"],
-                                bins=(bins_x1, bins_y1), norm=LogNorm(), cmap=plt.cm.jet)
+                                    bins=(bins_x1, bins_y1), norm=LogNorm(), cmap=plt.cm.jet)
             elif plot_type == "scatter":
                 ax_zx_scifi.scatter(df_12["z_real"], df_12["x_real"],
                                     color="blue", marker="o", label="SciFi", alpha=0.7)
@@ -405,7 +424,6 @@ class FairShipAnalyzer:
                                 f"E_nu = {df_event['E_nu'].iloc[0]:.2f} [GeV]")
 
             # Draw the neutrino arrow in real coordinates.
-            # Here we use the actual neutrino coordinates; for a simple arrow the tail is computed directly.
             scale_real = 1  # adjust scale if needed
             delta_z = scale_real * pz_nu
             delta_x = scale_real * px_nu
@@ -423,16 +441,13 @@ class FairShipAnalyzer:
                                 arrowprops=dict(arrowstyle="->", color="red", lw=2))
             ax_zx_scint.text(z_nu - 5, x_nu + label_offset, particle_name,
                             color="red", ha="center", va="bottom", fontsize=12)
-
             # --- Scintillator in real coordinates ---
             df_3 = df_event[df_event["layer_type"] == 3].copy()
-            # For scintillator, map cell id (fiber_id_local) to real x.
             df_3["x_real"] = df_3["x"]
-            # Map the layer_id (assumed to run from 0 to 44) to real z.
             df_3["z_real"] = df_3["z"]
             if plot_type == "hist2d":
                 ax_zx_scint.hist2d(df_3["z_real"], df_3["x_real"],
-                                bins=(bins_x1, bins_y1), norm=LogNorm(), weights=df_3["Eloss"], cmap=plt.cm.jet)
+                                    bins=(bins_x1, bins_y1), norm=LogNorm(), weights=df_3["Eloss"], cmap=plt.cm.jet)
             elif plot_type == "scatter":
                 ax_zx_scint.scatter(df_3["z_real"], df_3["x_real"],
                                     c=df_3["Eloss"], norm=LogNorm(), cmap=plt.cm.jet,
@@ -442,14 +457,234 @@ class FairShipAnalyzer:
             ax_zx_scint.set_title("Scintillator (Real). " +
                                 f"E_nu = {df_event['E_nu'].iloc[0]:.2f} [GeV]")
 
+        # -------------------------
+        # Plot the 3D Event Display if requested
+        # -------------------------
+        if plot_coords == "3d":
+            # For 3D, we combine both SciFi and Scintillator hits.
+            # Use real coordinates for X and Z, and estimate a fiber (Y) position from fiber_id_local.
+            df_12 = df_event[df_event["layer_type"].isin([1,2])].copy()
+            df_12["x_real"] = df_12["x"]
+            df_12["z_real"] = df_12["z"]
+            df_12["y_real"] = df_12["y"]
+
+            df_3 = df_event[df_event["layer_type"] == 3].copy()
+            df_3["x_real"] = df_3["x"]
+            df_3["z_real"] = df_3["z"]
+            df_3["y_real"] = df_3["y"]
+
+            if plot_type in ["hist2d", "scatter"]:
+                # For the 3D view we use scatter (hist2d is not typical in 3D).
+                ax_3d.scatter(df_12["z_real"], df_12["x_real"], df_12["y_real"],
+                            marker="o", label="SciFi", alpha=0.7)
+                ax_3d.scatter(df_3["z_real"], df_3["x_real"], df_3["y_real"],
+                            marker="^", label="Scintillator", alpha=0.7)
+            else:
+                raise ValueError("plot_type must be either 'hist2d' or 'scatter'")
+
+            ax_3d.set_xlabel("Z [cm]")
+            ax_3d.set_ylabel("X [cm]")
+            ax_3d.set_zlabel("Y [cm]")
+            ax_3d.set_title("3D Event Display. " + f"E_nu = {df_event['E_nu'].iloc[0]:.2f} [GeV]")
+            ax_3d.legend()
+            # Draw the neutrino arrow in 3D.
+            # Compute the neutrino's fiber position for the 3D display.
+            tip_z = z_nu
+            tip_x = x_nu
+            tip_y = y_nu
+            scale_3d = 1  # adjust as needed
+            delta_z = scale_3d * pz_nu
+            delta_x = scale_3d * px_nu
+            delta_y = scale_3d * py_nu
+            tail_z = tip_z - delta_z
+            tail_x = tip_x - delta_x
+            tail_y = tip_y - delta_y
+            ax_3d.quiver(tail_z, tail_x, tail_y,
+                        tip_z - tail_z, tip_x - tail_x, tip_y - tail_y,
+                        arrow_length_ratio=0.1, color="red", linewidth=2)
+            ax_3d.text(tip_z - 5, tip_x, tip_y + 2, particle_name,
+                    color="red", ha="center", va="bottom", fontsize=12)
+
         plt.tight_layout()
         fig.savefig(f"event_display_digi_{event_id}_{plot_type}_{plot_coords}.pdf")
 
+
+    def store_events_histograms(self, filename="event_histograms.root", plot_type="hist2d"):
+        """
+        Process the digitized DataFrame and, for each event, build two 2D numpy histograms:
+        - SciFi histogram: hits with layer_type 1 or 2.
+        - Scintillator histogram: hits with layer_type 3.
+        
+        The SciFi histogram uses the digitized layer_id (X axis) and fiber_id_local (Y axis)
+        with fixed binning (here we assume 90 layers and self.number_of_fibers fibers).
+        
+        The Scintillator histogram uses layer_id (X axis) and fiber_id_local (Y axis) with 
+        bins corresponding to 45 layers and 100 bins in Y (covering 0 to 2500), and if using
+        "hist2d" the hit weights are given by the energy loss (Eloss).
+
+        All events are then stored into a ROOT file (using uproot) as a TTree with branches:
+        - event_id  : integer event identifier.
+        - sciFi_hist: flattened numpy array holding the SciFi 2D histogram.
+        - scint_hist: flattened numpy array holding the scintillator 2D histogram.
+        
+        These histograms can later be reshaped back to their 2D form for CNN studies.
+        
+        Parameters:
+        filename  (str): The ROOT file name to store the histograms.
+        plot_type (str): Either "hist2d" or "scatter" (controls whether scintillator histogram
+                        uses weights from Eloss).
+        """
+        # --- Define fixed binning for the histograms ---
+        # For SciFi (digitized) hits:
+        total_sciFi_layers = 90  # Assuming 90 layers from 0 to 89
+        bins_scifi_x = np.arange(-0.5, total_sciFi_layers + 0.5, 1.0)
+        bins_scifi_y = np.linspace(0, self.number_of_fibers, self.number_of_fibers + 1)
+        scifi_shape = (len(bins_scifi_x)-1, len(bins_scifi_y)-1)
+
+        # For Scintillator hits:
+        # (Assuming layer_id runs roughly from 0 to 44; adjust binning if needed)
+        bins_scint_x = np.arange(-0.5, total_sciFi_layers + 0.5, 1.0)
+        bins_scint_y = np.linspace(0, 2500, 2501)
+        scint_shape = (len(bins_scint_x)-1, len(bins_scint_y)-1)
+
+        # --- Prepare lists to hold histogram data for each event ---
+        event_ids = []
+        sciFi_hists = []
+        scint_hists = []
+        E_nu = []
+        theta_nu = []
+        nu_flavor = []
+
+        # Group the DataFrame by event_id so we process one event at a time.
+        grouped = self.df_digi.groupby("event_id")
+        for event_id, df_event in grouped:
+            event_ids.append(event_id)
+            E_nu.append(df_event["E_nu"].iloc[0])
+            theta_nu.append(df_event["theta_nu"].iloc[0])
+            nu_flavor.append(df_event["pdg_nu"].iloc[0])
+            # --- Build SciFi histogram ---
+            # Filter hits for SciFi (layer_type 1 or 2)
+            df_scifi = df_event[df_event["layer_type"].isin([1, 2])]
+            if not df_scifi.empty:
+                H_scifi, _, _ = np.histogram2d(
+                    df_scifi["layer_id"],
+                    df_scifi["fiber_id_local"],
+                    bins=[bins_scifi_x, bins_scifi_y]
+                )
+            else:
+                H_scifi = np.zeros(scifi_shape)
+            # Flatten the histogram to a 1D array for storage.
+            sciFi_hists.append(H_scifi.flatten())
+
+            # --- Build Scintillator histogram ---
+            # Filter hits for scintillator (layer_type == 3)
+            df_scint = df_event[df_event["layer_type"] == 3]
+            if not df_scint.empty:
+                if plot_type == "hist2d":
+                    # Use the energy loss as weight.
+                    H_scint, _, _ = np.histogram2d(
+                        df_scint["layer_id"],
+                        df_scint["fiber_id_local"],
+                        bins=[bins_scint_x, bins_scint_y],
+                        weights=df_scint["Eloss"]
+                    )
+                elif plot_type == "scatter":
+                    H_scint, _, _ = np.histogram2d(
+                        df_scint["layer_id"],
+                        df_scint["fiber_id_local"],
+                        bins=[bins_scint_x, bins_scint_y]
+                    )
+                else:
+                    raise ValueError("plot_type must be 'hist2d' or 'scatter'")
+            else:
+                H_scint = np.zeros(scint_shape)
+            scint_hists.append(H_scint.flatten())
+
+        # Convert lists to numpy arrays for storage.
+        event_ids = np.array(event_ids, dtype=np.int32)
+        sciFi_hists = np.array(sciFi_hists, dtype=np.float32)  # shape: (n_events, scifi_flat_length)
+        scint_hists = np.array(scint_hists, dtype=np.float32)  # shape: (n_events, scint_flat_length)
+
+        # --- Write the histograms to a ROOT file ---
+        # Create a dictionary to be written as a TTree.
+        tree_data = {
+            "event_id": event_ids,
+            "sciFi_hist": sciFi_hists,
+            "scint_hist": scint_hists,
+            "E_nu": E_nu,
+            "theta_nu": theta_nu,
+            "nu_flavor": nu_flavor
+        }
+        
+        # Use uproot to create (or overwrite) the ROOT file with a TTree named "EventTree".
+        with uproot.recreate(filename) as root_file:
+            root_file["EventTree"] = tree_data
+
+
+
+    def read_events_histograms(self, filename="event_histograms.root"):
+        """
+        Reads the stored ROOT file and recovers the event information.
+        
+        Assumes the ROOT file contains a TTree named "EventTree" with the following branches:
+        - event_id  : integer event identifier.
+        - sciFi_hist: flattened numpy array for the SciFi 2D histogram.
+        - scint_hist: flattened numpy array for the scintillator 2D histogram.
+        - E_nu      : neutrino energy for the event.
+        - nu_flavor : neutrino flavor (as a string or integer representing the PDG code).
+        
+        The function reshapes the flattened SciFi histograms into a 2D array with shape:
+        (90, self.number_of_fibers)
+        and the scintillator histograms into a 2D array with shape:
+        (45, 100)
+        
+        Returns:
+        A dictionary containing:
+            - event_id  : numpy array of event IDs.
+            - sciFi_hist: numpy array of SciFi histograms, reshaped as (n_events, 90, self.number_of_fibers).
+            - scint_hist: numpy array of scintillator histograms, reshaped as (n_events, 45, 100).
+            - E_nu      : numpy array of neutrino energies.
+            - nu_flavor : numpy array of neutrino flavors.
+        """
+
+        # Open the ROOT file and access the TTree.
+        with uproot.open(filename) as file:
+            tree = file["EventTree"]
+            # Retrieve the branches as numpy arrays.
+            event_ids        = tree["event_id"].array(library="np")
+            sciFi_hists_flat = tree["sciFi_hist"].array(library="np")
+            scint_hists_flat = tree["scint_hist"].array(library="np")
+            E_nu             = tree["E_nu"].array(library="np")
+            nu_flavor        = tree["nu_flavor"].array(library="np")
+        
+        # Define the expected shapes of the histograms.
+        # SciFi: 90 layers and self.number_of_fibers fibers.
+        sciFi_shape = (90, self.number_of_fibers)
+        # Scintillator: 45 layers and 100 bins in the fiber/cell direction.
+        scint_shape = (45, 100)
+        
+        # Reshape the flattened histograms back to their 2D shapes.
+        sciFi_hists = sciFi_hists_flat.reshape(-1, sciFi_shape[0], sciFi_shape[1])
+        scint_hists = scint_hists_flat.reshape(-1, scint_shape[0], scint_shape[1])
+        
+        # Return the recovered information as a dictionary.
+        return {
+            "event_id": event_ids,
+            "sciFi_hist": sciFi_hists,
+            "scint_hist": scint_hists,
+            "E_nu": E_nu,
+            "nu_flavor": nu_flavor
+        }
+
+
     def create_fiber_structure(self):
-        df_digi = {"event_id": [], "multiplicity": [], "track_id": [], "E_nu": [], "px_nu": [], "pz_nu": [], "x_nu": [], "z_nu": [], "pdg_nu": [], "fiber_id": [], "fiber_id_local": [], "layer_type": [], "layer_id": [], "x": [], "y": [], "z": [], "pdg": [], "Eloss": []}
+        df_digi = {"event_id": [], "multiplicity": [], "track_id": [], 
+                   "E_nu": [], "theta_nu": [], "px_nu": [], "py_nu": [], "pz_nu": [], "x_nu": [], "y_nu": [], "z_nu": [], "pdg_nu": [], 
+                   "fiber_id": [], "fiber_id_local": [], "layer_type": [], "layer_id": [], 
+                   "x": [], "y": [], "z": [], "pdg": [], "Eloss": []}
         for i, event in enumerate(self.chain):
             E_nu = np.sqrt(event.MCTrack[0].GetPx()**2 + event.MCTrack[0].GetPy()**2 + event.MCTrack[0].GetPz()**2)
-            Px_nu, Pz_nu, X_nu, Z_nu = event.MCTrack[0].GetPx(), event.MCTrack[0].GetPz(), event.MCTrack[0].GetStartX(), event.MCTrack[0].GetStartZ()
+            Px_nu, Py_nu, Pz_nu, X_nu, Y_nu, Z_nu = event.MCTrack[0].GetPx(), event.MCTrack[0].GetPy(), event.MCTrack[0].GetPz(), event.MCTrack[0].GetStartX(), event.MCTrack[0].GetStartY(), event.MCTrack[0].GetStartZ()
             event_multiplicity = 0
             for mctrack in event.MCTrack:
                 if mctrack.GetMotherId() == 0:
@@ -470,9 +705,12 @@ class FairShipAnalyzer:
                 df_digi["multiplicity"].append(event_multiplicity)
                 df_digi["track_id"].append(hit.GetTrackID())
                 df_digi["E_nu"].append(E_nu)
+                df_digi["theta_nu"].append(np.arccos(Pz_nu / E_nu)*180/np.pi)
                 df_digi["px_nu"].append(Px_nu)
+                df_digi["py_nu"].append(Py_nu)
                 df_digi["pz_nu"].append(Pz_nu)
                 df_digi["x_nu"].append(X_nu)
+                df_digi["y_nu"].append(Y_nu)
                 df_digi["z_nu"].append(Z_nu)
                 df_digi["pdg_nu"].append(event.MCTrack[0].GetPdgCode())
                 df_digi["fiber_id"].append(fiber_id)
@@ -506,8 +744,9 @@ def main():
     parser.add_argument("--Eloss_threshold", type=float, default=180, help="Energy loss threshold")
     parser.add_argument("--event_id", type=int, default=22, help="Event ID to display")
     parser.add_argument("--plot_type", type=str, default="hist2d", choices=["hist2d", "scatter"], help="Type of plot")
-    parser.add_argument("--plot_coords", type=str, default="both", choices=["digi", "zx", "both"], help="Coordinate system(s) to plot")
-
+    parser.add_argument("--plot_coords", type=str, default="both", choices=["digi", "zx", "both", "3d"], help="Coordinate system(s) to plot")
+    parser.add_argument("--mode", type=str, default="dummy", choices=["display", "store", "read", "dummy"], help="Mode of operation")
+    parser.add_argument("--output", type=str, default="event_histograms.root", help="Output filename for histograms")
     args = parser.parse_args()
 
     fiber_dimensions = {
@@ -522,15 +761,24 @@ def main():
         "Eloss_threshold": args.Eloss_threshold
     }
 
-    analyzer = FairShipAnalyzer(args.file)
-    analyzer.set_fiber_dimensions(detector_properties, fiber_dimensions)
-
-    print(analyzer.get_entries())
-    print(analyzer.get_branches())
+    analyzer = FairShipAnalyzer(args.file, detector_properties, fiber_dimensions)
     analyzer.create_fiber_structure()
-    # analyzer.analyze_events()
+    analyzer.analyze_events()
     print(args.event_id)
-    analyzer.event_display_digi_new(args.event_id, args.plot_type, args.plot_coords)
+    if args.mode == "display":
+        # analyzer.event_display_digi(args.event_id)
+        # analyzer.event_display_digi_new(args.event_id, args.plot_type, args.plot_coords)
+        analyzer.event_display_digi_new(args.event_id, args.plot_type, args.plot_coords)
+    elif args.mode == "store":
+        analyzer.store_events_histograms(filename=args.output, plot_type=args.plot_type)
+    elif args.mode == "read":
+        analyzer.read_events_histograms(filename=args.output)
+        # analyzer.event_display_digi_new(args.event_id, args.plot_type, args.plot_coords)
+        # analyzer.event_display_digi_new(args.event_id, "hist2d", "zx")
+        # analyzer.event_display_digi_new(args.event_id, "scatter", "zx")
+    else:
+        print("Dummy mode: No action taken.")
+
 
 if __name__ == "__main__":
     main()

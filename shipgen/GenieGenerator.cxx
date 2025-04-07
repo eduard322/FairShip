@@ -236,6 +236,65 @@ Double_t GenieGenerator::MeanMaterialBudget(const Double_t *start, const Double_
   return bparam[0]/step;
 }
 
+void GenieGenerator::GenerateNeutrinoTrajectory(
+  Int_t neu,
+  Double_t pzv,
+  Double_t ztarget,
+  Double_t startZ,
+  Double_t endZ,
+  Double_t start[3],
+  Double_t end[3],
+  Double_t& txnu,
+  Double_t& tynu,
+  Double_t pout[3],
+  Double_t mparam[10],
+  TH1D* pxhist[],
+  TH1D* pyslice[][100], // or use your actual max bins here
+  Int_t idbase)
+{
+  Double_t bparam = 0.;
+  pout[2] = -1.;
+
+  while (pout[2] < 0.) {
+      Int_t idhnu = TMath::Abs(neu) + idbase;
+      if (neu < 0) idhnu += 1000;
+
+      Int_t nbinmx = pxhist[idhnu]->GetNbinsX();
+      Double_t pl10 = log10(pzv);
+      Int_t nbx = pxhist[idhnu]->FindBin(pl10);
+      if (nbx < 1) nbx = 1;
+      if (nbx > nbinmx) nbx = nbinmx;
+
+      Double_t ptlog10 = pyslice[idhnu][nbx]->GetRandom();  // fixed
+      Double_t pt = pow(10., ptlog10) - 0.01;
+
+      Double_t phi = gRandom->Uniform(0., 2 * TMath::Pi());
+      pout[0] = cos(phi) * pt;
+      pout[1] = sin(phi) * pt;
+      pout[2] = pzv * pzv - pt * pt;
+
+      if (pout[2] >= 0.) {
+          pout[2] = TMath::Sqrt(pout[2]);
+          if (gRandom->Uniform(-1., 1.) < 0.) pout[0] = -pout[0];
+          if (gRandom->Uniform(-1., 1.) < 0.) pout[1] = -pout[1];
+
+          start[0] = (pout[0] / pout[2]) * (startZ - ztarget);
+          start[1] = (pout[1] / pout[2]) * (startZ - ztarget);
+          start[2] = startZ;
+
+          txnu = pout[0] / pout[2];
+          tynu = pout[1] / pout[2];
+
+          end[0] = txnu * (endZ - ztarget);
+          end[1] = tynu * (endZ - ztarget);
+          end[2] = endZ;
+
+          bparam = MeanMaterialBudget(start, end, mparam);
+      }
+  }
+}
+
+
 std::vector<double> GenieGenerator::Rotate(Double_t x, Double_t y, Double_t z, Double_t px, Double_t py, Double_t pz)
 {
   //rotate vector px,py,pz to point at x,y,z at origin.
@@ -465,73 +524,90 @@ Bool_t GenieGenerator::ReadEvent(FairPrimaryGenerator* cpg)
     Double_t bparam=0.;
     Double_t mparam[10];
     Double_t pout[3];
-    pout[2]=-1.;
     Double_t txnu=0;
     Double_t tynu=0;
     //Does this neutrino fly through material? Otherwise draw another pt..
     //cout << "Info GenieGenerator Start bparam while loop" << endl;
-    while (pout[2]<0.) {
-      //***OLD**** Keep for comparison maybe??
-      //generate pt of ~0.3 GeV
-      //pout[0] = gRandom->Exp(0.2);
-      //pout[1] = gRandom->Exp(0.2);
-      //pout[2] = pzv*pzv-pout[0]*pout[0]-pout[1]*pout[1];
-
-      //**NEW** get pt of this neutrino from 2D hists.
-      Int_t idhnu=TMath::Abs(neu)+idbase;
-      if (neu<0) idhnu+=1000;
-      Int_t nbinmx=pxhist[idhnu]->GetNbinsX();
-      Double_t pl10=log10(pzv);
-      Int_t nbx=pxhist[idhnu]->FindBin(pl10);
-      //printf("idhnu %d, p %f log10(p) %f bin,binmx %d %d \n",idhnu,pzv,pl10,nbx,nbinmx);
-      if (nbx<1) nbx=1;
-      if (nbx>nbinmx) nbx=nbinmx;
-      Double_t ptlog10=pyslice[idhnu][nbx]->GetRandom();
-//hist was filled with: log10(pt+0.01)
-      Double_t pt=pow(10.,ptlog10)-0.01;
-      //rotate pt in phi:
-      Double_t phi=gRandom->Uniform(0.,2*TMath::Pi());
-      pout[0] = cos(phi)*pt;
-      pout[1] = sin(phi)*pt;
-      pout[2] = pzv*pzv-pt*pt;
-      //printf("p= %f pt=%f px,py,pz**2=%f,%f,%f\n",pzv,pt,pout[0],pout[1],pout[2]);
-
-      if (pout[2]>=0.) {
-        pout[2]=TMath::Sqrt(pout[2]);
-        if (gRandom->Uniform(-1.,1.)<0.) pout[0]=-pout[0];
-        if (gRandom->Uniform(-1.,1.)<0.) pout[1]=-pout[1];
-        //cout << "Info GenieGenerator: neutrino pxyz " << pout[0] << ", " << pout[1] << ", " << pout[2] << endl;
-        // xyz at start and end
-        start[0]=(pout[0]/pout[2])*(start[2]-ztarget);
-        start[1]=(pout[1]/pout[2])*(start[2]-ztarget);
-        //cout << "Info GenieGenerator: neutrino xyz-start " << start[0] << "-" << start[1] << "-" << start[2] << endl;
-        txnu=pout[0]/pout[2];
-        tynu=pout[1]/pout[2];
-        end[0]=txnu*(end[2]-ztarget);
-        end[1]=tynu*(end[2]-ztarget);
-        //cout << "Info GenieGenerator: neutrino xyz-end " << end[0] << "-" << end[1] << "-" << end[2] << endl;
-        //get material density between these two points
-        bparam=MeanMaterialBudget(start, end, mparam);
-        //printf("param %e %e %e \n",bparam,mparam[6],mparam[7]);
-       }
-    }
+    GenerateNeutrinoTrajectory(
+      neu,
+      pzv,
+      ztarget,
+      startZ,
+      endZ,
+      start,
+      end,
+      txnu,
+      tynu,
+      pout,
+      mparam,
+      pxhist,
+      pyslice,
+      idbase
+    );
     //loop over trajectory between start and end to pick an interaction point
     Double_t prob2int = -1.;
     Double_t x;
     Double_t y;
     Double_t z;
     Int_t count=0;
+    Int_t count_accp;
     while (prob2int<gRandom->Uniform(0.,1.)) {
       //place x,y,z uniform along path
-      z=gRandom->Uniform(start[2],end[2]);
-      x=txnu*(z-ztarget);
-      y=tynu*(z-ztarget);
+      count_accp = 0;
+      // while(count_accp < 1){
+        z=gRandom->Uniform(start[2],end[2]);
+        x=txnu*(z-ztarget);
+        y=tynu*(z-ztarget);
+        // if (fabs(x)<x_accp/2. && fabs(y)<y_accp/2.) {
+        //   break;
+        // }
+        // count_accp++;  
+      // }
+      // z=gRandom->Uniform(start[2],end[2]);
+
+      // GenerateNeutrinoTrajectory(
+      //   neu,
+      //   pzv,
+      //   ztarget,
+      //   startZ,
+      //   endZ,
+      //   start,
+      //   end,
+      //   txnu,
+      //   tynu,
+      //   pout,
+      //   mparam,
+      //   pxhist,
+      //   pyslice,
+      //   idbase
+      // );
+      // x=txnu*(z-ztarget);
+      // y=tynu*(z-ztarget);
+      // if(count_accp < 10){
+      //   if (fabs(x)>x_accp/2. || fabs(y)>y_accp/2.) {
+      //     //cout << "Info GenieGenerator: x,y,z out of acceptance " << x << ", " << y << ", " << z << endl;
+      //     count_accp++;
+      //     continue;
+      //   }
+      // }
+      cout << "Info GenieGenerator: x,y,z " << x << ", " << y << ", " << z << endl;
+      if(count_accp == 1){
+        cout << "Failed sampling within acceptance after 1 tries" << endl;
+      }
       if (mparam[6]<0.5){
         //mparam is number of boundaries along path. mparam[6]=0.: uniform material budget along path, use present x,y,z
         prob2int=2.;
       }else{
         //get local material at this point, to calculate probability that interaction is at this point.
         TGeoNode *node = gGeoManager->FindNode(x,y,z);
+        // if (x_accp > 0. && y_accp > 0.) {
+        //   // sample until abs(x) < x_accp/2. and abs(y) < y_accp/2.
+        //   cout << "Info GenieGenerator: x,y,z " << x << ", " << y << ", " << z << endl;
+        //   if (fabs(x)>x_accp/2. || fabs(y)>y_accp/2.) {
+        //     //cout << "Info GenieGenerator: x,y,z out of acceptance " << x << ", " << y << ", " << z << endl;
+        //     continue;
+        //   }
+        // }
         TGeoMaterial *mat = 0;
         if (node && !gGeoManager->IsOutside()) {
           mat = node->GetVolume()->GetMaterial();

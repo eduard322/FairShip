@@ -30,10 +30,32 @@ class GenieGenerator : public FairGenerator
   virtual Bool_t Init(const char*); //!
   Int_t GetNevents();
   void NuOnly(){fNuOnly = true;}
-  void SetPositions(Double_t zTa, Double_t zS=-3400., Double_t zE=2650.){
+  void GenerateNeutrinoTrajectory(
+    Int_t neu,
+    Double_t pzv,
+    Double_t ztarget,
+    Double_t startZ,
+    Double_t endZ,
+    Double_t start[3],
+    Double_t end[3],
+    Double_t& txnu,
+    Double_t& tynu,
+    Double_t pout[3],
+    Double_t mparam[10],
+    TH1D* pxhist[],
+    TH1D* pyslice[][100],
+    Int_t idbase);
+  void SetPositions(Double_t zTa, Double_t zS=-3400., Double_t zE=2650., Double_t x_lim = 0., Double_t y_lim=0.){
     ztarget     = zTa;
     startZ      = zS;
     endZ        = zE;
+    if (x_lim != 0. || y_lim != 0.) {
+      x_accp = y_lim;
+      y_accp = x_lim;
+    } else {
+      x_accp = 0.;
+      y_accp = 0.;
+    }
   }
   void AddBox(TVector3 dVec, TVector3 box);
   Double_t MeanMaterialBudget(const Double_t *start, const Double_t *end, Double_t *mparam);
@@ -43,7 +65,7 @@ class GenieGenerator : public FairGenerator
  private:
 
  protected:
-  Double_t Yvessel,Xvessel,Lvessel,ztarget,startZ,endZ;
+  Double_t Yvessel,Xvessel,Lvessel,ztarget,startZ,endZ, x_accp, y_accp;
   Double_t Ev,pxv,pyv,pzv, El,pxl, pyl, pzl,vtxx,vtxy,vtxz,vtxt;
   Double_t Ef[500], pxf[500], pyf[500], pzf[500];
   Int_t pdgf[500];

@@ -428,7 +428,7 @@ if simEngine == "Genie":
  Geniegen.Init(inputFile,options.firstEvent)
 #  Geniegen.SetPositions(ship_geo.target.z0, ship_geo.tauMudet.zMudetC-5*u.m, ship_geo.TrackStation2.z)
  # -3512.3900   -3174.8900
- Geniegen.SetPositions(ship_geo.target.z0, -3513.0, -3173.0)
+ Geniegen.SetPositions(ship_geo.target.z0, -3513.0, -3173.0, 45, 45)
  primGen.AddGenerator(Geniegen)
  options.nEvents = min(options.nEvents,Geniegen.GetNevents())
  run.SetPythiaDecayer("DecayConfigNuAge.C")
