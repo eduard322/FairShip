@@ -266,7 +266,7 @@ class DrawEcalCluster(ROOT.FairTask):
                 )
                 if mccell.GetEnergy() / u.MeV < 4.0:
                     continue
-                    # ADC noise simulated Guassian with \sigma=1 MeV
+                    # ADC noise simulated Gaussian with \sigma=1 MeV
                 DClus = ROOT.TEveBox()
                 DClus.SetName("EcalCluster_" + str(cl) + "_" + str(i))
                 DClus.SetPickable(ROOT.kTRUE)
@@ -472,6 +472,7 @@ class DrawTracks(ROOT.FairTask):
                 "strawtubesPoint",
                 "ShipRpcPoint",
                 "TargetPoint",
+                "MtcDetPoint",
                 "TimeDetPoint",
             ]:
                 if not sTree.GetBranch(P):
@@ -1261,7 +1262,7 @@ def mydebug():
             t.MCEventHeader.GetRunID(),
             t.MCEventHeader.GetZ(),
         )
-    # geometrie
+    # Load geometry
     sGeo = ROOT.gGeoManager
     cave = sGeo.GetTopVolume()
     cave.Draw("ogl")
@@ -1290,12 +1291,8 @@ from basiclibs import *
 # -----   Reconstruction run   -------------------------------------------
 fRun = ROOT.FairRunAna()
 if options.geoFile:
-    if options.geoFile[0:4] == "/eos":
-        options.geoFile = ROOT.gSystem.Getenv("EOSSHIP") + options.geoFile
     fRun.SetGeomFile(options.geoFile)
 
-if options.InputFile[0:4] == "/eos":
-    options.InputFile = ROOT.gSystem.Getenv("EOSSHIP") + options.InputFile
 inFile = ROOT.FairFileSource(options.InputFile)
 fRun.SetSource(inFile)
 if options.OutputFile is None:
@@ -1387,6 +1384,10 @@ else:
     mcHits["TargetPoints"] = ROOT.FairMCPointDraw(
         "TargetPoint", ROOT.kRed, ROOT.kFullSquare
     )
+    mcHits["MtcDetPoint"] = ROOT.FairMCPointDraw(
+        "MtcDetPoint", ROOT.kGreen, ROOT.kFullSquare
+    )
+
 
 for x in mcHits:
     fMan.AddTask(mcHits[x])

@@ -15,13 +15,15 @@ def main():
     options = parser.parse_args()
 
     f = ROOT.TFile.Open(options.path + "/ship.conical.Pythia8-TGeant4_rec.root", "read")
-    tree = f.cbmsim
+    tree = f.Get("cbmsim")
 
     geo_file = ROOT.TFile.Open(
         options.path + "/geofile_full.conical.Pythia8-TGeant4.root", "read"
     )
 
     selection = analysis_toolkit.selection_check(geo_file)
+    inspector = analysis_toolkit.event_inspector()
+
     hist_dict = {}
 
     ut.bookHist(hist_dict, "event_weight", "Event weight", 100, 100, 100)
@@ -74,6 +76,9 @@ def main():
         if len(event.Particles) == 0:
             continue
 
+        print(f"Event{event_nr}:")
+        inspector.dump_event(event, mom_threshold=0.5)  # in GeV
+
         event_weight = event.MCTrack[2].GetWeight()
 
         hist_dict["event_weight"].Fill(event_weight)
@@ -101,8 +106,6 @@ def main():
                 print(
                     f"Event:{event_nr} Candidate_index: {candidate_id_in_event} <--passes the pre-selection\n\n"
                 )
-            else:
-                print(f"Event:{event_nr} Candidate_index: {candidate_id_in_event} \n\n")
 
     ut.writeHists(hist_dict, "preselectionparameters.root")
 

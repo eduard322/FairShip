@@ -2,14 +2,13 @@
 import os
 import sys
 import ROOT
-ROOT.gSystem.Load('libEGPythia8')
 
 import shipunit as u
 import shipRoot_conf
 import rootUtils as ut
 from ShipGeoConfig import ConfigRegistry
 from argparse import ArgumentParser
-
+from array import array
 DownScaleDiMuon = False
 
 # Default HNL parameters
@@ -20,7 +19,7 @@ theProductionCouplings = theDecayCouplings = None
 theDPmass    = 0.2*u.GeV
 
 # Alpaca
-motherMode = True
+#motherMode = True
 
 mcEngine     = "TGeant4"
 simEngine    = "Pythia8"  # "Genie" # Ntuple
@@ -38,39 +37,23 @@ inputFile    = "/eos/experiment/ship/data/Charm/Cascade-parp16-MSTP82-1-MSEL4-97
 defaultInputFile = True
 
 globalDesigns = {
-     '2016' : {
-          'dy' : 10.,
-          'dv' : 5,
-          'ds' : 7,
-          'nud' : 1,
-          'caloDesign' : 0,
-          'strawDesign' : 4
-     }, '2018' : {
-          'dy' : 10.,
+     '2023' : {
+          'dy' : 6.,
           'dv' : 6,
-          'ds' : 9,
-          'nud' : 3,
+          'nud' : 4,
           'caloDesign' : 3,
           'strawDesign' : 10
-     }, '2022' : {
-          'dy' : 8.,
-          'dv' : 6,
-          'ds' : 9,
-          'nud' : 3,
-          'caloDesign' : 3,
-          'strawDesign' : 10
-     }, '2023' : {
+     },
+     '2025' : {
           'dy' : 6.,
           'dv' : 6,
           'ds' : 8,
           'nud' : 4,
-          'caloDesign' : 3,
+          'caloDesign' : 2,
           'strawDesign' : 10
-     }
+     },
 }
-default = '2023'
-
-inactivateMuonProcesses = False   # provisionally for making studies of various muon background sources
+default = '2025'
 
 parser = ArgumentParser()
 group = parser.add_mutually_exclusive_group()
@@ -113,30 +96,26 @@ parser.add_argument("-o", "--output",dest="outputDir",  help="Output directory",
 parser.add_argument("-Y",        dest="dy",  help="max height of vacuum tank", required=False, default=globalDesigns[default]['dy'])
 parser.add_argument("--tankDesign", dest="dv",      help="4=TP elliptical tank design, 5 = optimized conical rectangular design, 6=5 without segment-1"\
                                             ,required=False, default=globalDesigns[default]['dv'], type=int)
-parser.add_argument("--muShieldDesign", dest="ds",  help="7=short magnet design, 9=optimised with T4 as constraint, 8=requires config file\
-                                            ,10=with field map for hadron absorber", required=False, choices=range(7,11), default=globalDesigns[default]['ds'], type=int)
 parser.add_argument("--nuTauTargetDesign", dest="nud"\
-  ,help="0=TP, 1=new magnet option for short muon shield, 2= no magnet surrounding neutrino detector, 3= emulsion spectrometer and muon filter as in CDS, 4= not magnetized target and muon spectrometer for ECN3",required=False, default=globalDesigns[default]['nud'], type=int)
+  ,help="3: emulsion spectrometer and muon filter as in CDS, 4: not magnetized target and muon spectrometer for ECN3", default=globalDesigns[default]['nud'], type=int, choices=[3,4])
 parser.add_argument("--caloDesign",
                     help="0=ECAL/HCAL TP 2=splitCal  3=ECAL/ passive HCAL",
                     default=globalDesigns[default]['caloDesign'],
                     type=int,
                     choices=[0,2,3])
-parser.add_argument("--strawDesign", dest="strawDesign", help="simplistic tracker design,  4=sophisticated straw tube design, horizontal wires (default), 10=2cm straw"
-                                            ,required=False, default=globalDesigns[default]['strawDesign'], type=int)
+parser.add_argument("--strawDesign", help="Tracker design: 4=sophisticated straw tube design, horizontal wires; 10=straw of 2 cm diameter (default)",
+                    default=globalDesigns[default]['strawDesign'], type=int, choices=[4,10])
 parser.add_argument("-F",        dest="deepCopy",  help="default = False: copy only stable particles to stack, except for HNL events", required=False, action="store_true")
 parser.add_argument("-t", "--test", dest="testFlag",  help="quick test", required=False,action="store_true")
 parser.add_argument("--dry-run", dest="dryrun",  help="stop after initialize", required=False,action="store_true")
 parser.add_argument("-D", "--display", dest="eventDisplay", help="store trajectories", required=False, action="store_true")
-parser.add_argument("--stepMuonShield", dest="muShieldStepGeo", help="activate steps geometry for the muon shield", required=False, action="store_true", default=False)
-parser.add_argument("--coMuonShield", dest="muShieldWithCobaltMagnet", help="replace one of the magnets in the shield with 2.2T cobalt one, downscales other fields, works only for muShieldDesign >2", required=False, type=int, default=0)
-parser.add_argument("--noSC", dest="SC_mag", help="Deactivate SC muon shield. Configuration: 1 SC magnet (3*B_warm) + 3 warm magnets with inverted fields", action='store_false')
-parser.add_argument("--scName", help="The name of the SC shield in the database", default="sc_v6")
-parser.add_argument("--MesonMother",   dest="MM",  help="Choose DP production meson source", required=False,  default=True)
+parser.add_argument("--shieldName", help="The name of the SC shield in the database. SC default: sc_v6, Warm default: warm_opt", default="sc_v6", choices=["sc_v6", "warm_opt"])
+parser.add_argument("--MesonMother",   dest="MM",  help="Choose DP production meson source: pi0, eta, omega, eta1, eta11", required=False,  default='pi0')
 parser.add_argument("--debug",  help="1: print weights and field 2: make overlap check", required=False, default=0, type=int, choices=range(0,3))
+parser.add_argument("--field_map", default=None, help="Specify spectrometer field map.")
 parser.add_argument(
     "--helium",
-    dest="decayVolMed", 
+    dest="decayVolMed",
     help="Set Decay Volume medium to helium. NOOP, as default is helium",
     action="store_const",
     const="helium",
@@ -150,7 +129,9 @@ parser.add_argument(
     const="vacuums",
     default="helium"
 )
+
 parser.add_argument("--SND", dest="SND", help="Activate SND.", action='store_true')
+parser.add_argument("--SND_design", help="Choose SND design among [1,2,...]. 1: old version, 2: MTC", type=int, choices=[1, 2], default=1)
 parser.add_argument("--noSND", dest="SND", help="Deactivate SND. NOOP, as it currently defaults to off.", action='store_false')
 
 options = parser.parse_args()
@@ -203,7 +184,6 @@ if (HNL and options.RPVSUSY) or (HNL and options.DarkPhoton) or (options.DarkPho
 
 if (simEngine == "Genie" or simEngine == "nuRadiography") and defaultInputFile:
   inputFile = "/eos/experiment/ship/data/GenieEvents/genie-nu_mu.root"
-            # "/eos/experiment/ship/data/GenieEvents/genie-nu_mu_bar.root"
 if simEngine == "muonDIS" and defaultInputFile:
   print('input file required if simEngine = muonDIS')
   print(" for example -f  /eos/experiment/ship/data/muonDIS/muonDis_1.root")
@@ -218,24 +198,20 @@ if (simEngine == "Ntuple" or simEngine == "MuonBack") and defaultInputFile :
   sys.exit()
 ROOT.gRandom.SetSeed(options.theSeed)  # this should be propagated via ROOT to Pythia8 and Geant4VMC
 shipRoot_conf.configure(0)     # load basic libraries, prepare atexit for python
-# - muShieldDesign = 7  # 7 = short design+magnetized hadron absorber
 # - targetOpt      = 5  # 0=solid   >0 sliced, 5: 5 pieces of tungsten, 4 H20 slits, 17: Mo + W +H2O (default)
-#   nuTauTargetDesign = 0 # 0 = TP, 1 = NEW with magnet, 2 = NEW without magnet, 3 = 2018 design
+#   nuTauTargetDesign = 3 #3 = 2018 design, 4 = not magnetized target + spectrometer
 ship_geo = ConfigRegistry.loadpy(
      "$FAIRSHIP/geometry/geometry_config.py",
      Yheight=options.dy,
      tankDesign=options.dv,
-     muShieldDesign=options.ds,
      nuTauTargetDesign=options.nud,
      CaloDesign=options.caloDesign,
      strawDesign=options.strawDesign,
      muShieldGeo=options.geofile,
-     muShieldStepGeo=options.muShieldStepGeo,
-     muShieldWithCobaltMagnet=options.muShieldWithCobaltMagnet,
-     SC_mag=options.SC_mag,
-     scName=options.scName,
+     shieldName=options.shieldName,
      DecayVolumeMedium=options.decayVolMed,
      SND=options.SND,
+     SND_design=options.SND_design
 )
 
 # Output file name, add dy to be able to setup geometry with ambiguities.
@@ -246,13 +222,13 @@ if options.eventDisplay: tag = tag+'_D'
 if options.dv > 4 : tag = 'conical.'+tag
 if not os.path.exists(options.outputDir):
   os.makedirs(options.outputDir)
-outFile = "%s/ship.%s.root" % (options.outputDir, tag)
+outFile = f"{options.outputDir}/ship.{tag}.root"
 
 # rm older files !!!
 for x in os.listdir(options.outputDir):
-  if not x.find(tag)<0: os.system("rm %s/%s" % (options.outputDir, x) )
+  if not x.find(tag)<0: os.system(f"rm {options.outputDir}/{x}" )
 # Parameter file name
-parFile="%s/ship.params.%s.root" % (options.outputDir, tag)
+parFile=f"{options.outputDir}/ship.params.{tag}.root"
 
 # In general, the following parts need not be touched
 # ========================================================================
@@ -271,7 +247,6 @@ rtdb = run.GetRuntimeDb()
 # import shipMuShield_only as shipDet_conf # special use case for an attempt to convert active shielding geometry for use with FLUKA
 # import shipTarget_only as shipDet_conf
 import shipDet_conf
-
 modules = shipDet_conf.configure(run,ship_geo)
 # -----Create PrimaryGenerator--------------------------------------
 primGen = ROOT.FairPrimaryGenerator()
@@ -317,7 +292,7 @@ if simEngine == "Pythia8":
   P8gen.SetLmin((ship_geo.Chamber1.z - ship_geo.chambers.Tub1length) - ship_geo.target.z0 )
   P8gen.SetLmax(ship_geo.TrackStation1.z - ship_geo.target.z0 )
  if charmonly:
-  primGen.SetTarget(0., 0.) #vertex is setted in pythia8Generator
+  primGen.SetTarget(0., 0.) #vertex is set in pythia8Generator
   ut.checkFileExists(inputFile)
   if ship_geo.Box.gausbeam:
    primGen.SetBeam(0.,0., 0.5, 0.5) #more central beam, for hits in downstream detectors
@@ -332,7 +307,6 @@ if simEngine == "Pythia8":
 # P8gen.SetMom(500.*u.GeV)
 # P8gen.SetId(-211)
  primGen.AddGenerator(P8gen)
-
 if simEngine == "FixedTarget":
  P8gen = ROOT.FixedTargetGenerator()
  P8gen.SetTarget("volTarget_1",0.,0.)
@@ -388,13 +362,14 @@ if simEngine == "muonDIS":
  DISgen.Init(inputFile,options.firstEvent)
  primGen.AddGenerator(DISgen)
  options.nEvents = min(options.nEvents,DISgen.GetNevents())
- inactivateMuonProcesses = True # avoid unwanted hadronic events of "incoming" muon flying backward
  print('Generate ',options.nEvents,' with DIS input', ' first event',options.firstEvent)
 # -----neutrino interactions from nuage------------------------
 if simEngine == "Nuage":
  primGen.SetTarget(0., 0.)
  Nuagegen = ROOT.NuageGenerator()
  Nuagegen.EnableExternalDecayer(1) #with 0 external decayer is disable, 1 is enabled
+
+ #CAMM - This is broken now, need info from dedicated SND geo...
  print('Nuage position info input=',ship_geo.EmuMagnet.zC-ship_geo.NuTauTarget.zdim, ship_geo.EmuMagnet.zC+ship_geo.NuTauTarget.zdim)
  #--------------------------------
  #to Generate neutrino interactions in the whole neutrino target
@@ -419,6 +394,7 @@ if simEngine == "Nuage":
  options.nEvents = min(options.nEvents,Nuagegen.GetNevents())
  run.SetPythiaDecayer("DecayConfigNuAge.C")
  print('Generate ',options.nEvents,' with Nuage input', ' first event',options.firstEvent)
+ #-CAMM end broken part
 # -----Neutrino Background------------------------
 if simEngine == "Genie":
 # Genie
@@ -473,9 +449,7 @@ if simEngine == "MuonBack":
  MuonBackgen.Init(inputFile,options.firstEvent,options.phiRandom)
  MuonBackgen.SetSmearBeam(5 * u.cm) # radius of ring, thickness 8mm
  if DownScaleDiMuon:
-    if inputFile[0:4] == "/eos": test = os.environ["EOSSHIP"]+inputFile
-    else: test = inputFile
-    testf = ROOT.TFile.Open(test)
+    testf = ROOT.TFile.Open(inputFile)
     if not testf.FileHeader.GetTitle().find('diMu100.0')<0:
         MuonBackgen.SetDownScaleDiMuon()   # avoid interference with boosted channels
         print("MuonBackgenerator: set downscale for dimuon on")
@@ -518,15 +492,17 @@ if options.dryrun: # Early stop after setting up Pythia 8
  sys.exit(0)
 gMC = ROOT.TVirtualMC.GetMC()
 fStack = gMC.GetStack()
+EnergyCut = 10. * u.MeV if options.mudis else 100. * u.MeV
+
 if MCTracksWithHitsOnly:
  fStack.SetMinPoints(1)
  fStack.SetEnergyCut(-100.*u.MeV)
 elif MCTracksWithEnergyCutOnly:
  fStack.SetMinPoints(-1)
- fStack.SetEnergyCut(100.*u.MeV)
+ fStack.SetEnergyCut(EnergyCut)
 elif MCTracksWithHitsOrEnergyCut:
  fStack.SetMinPoints(1)
- fStack.SetEnergyCut(100.*u.MeV)
+ fStack.SetEnergyCut(EnergyCut)
 elif options.deepCopy:
  fStack.SetMinPoints(0)
  fStack.SetEnergyCut(0.*u.MeV)
@@ -549,7 +525,9 @@ import geomGeant4
 # any field maps, or defining if any volumes feel only the local or local+global field.
 # For now, just keep the fields already defined by the C++ code, i.e comment out the fieldMaker
 if hasattr(ship_geo.Bfield,"fieldMap"):
-      fieldMaker = geomGeant4.addVMCFields(ship_geo, '', True)
+     if options.field_map:
+          ship_geo.Bfield.fieldMap = options.field_map
+     fieldMaker = geomGeant4.addVMCFields(ship_geo, verbose=True)
 
 # Print VMC fields and associated geometry objects
 if options.debug == 1:
@@ -560,18 +538,6 @@ if options.debug == 1:
 #fieldMaker.plotField(1, ROOT.TVector3(-9000.0, 6000.0, 50.0), ROOT.TVector3(-300.0, 300.0, 6.0), 'Bzx.png')
 #fieldMaker.plotField(2, ROOT.TVector3(-9000.0, 6000.0, 50.0), ROOT.TVector3(-400.0, 400.0, 6.0), 'Bzy.png')
 
-if inactivateMuonProcesses :
- ROOT.gROOT.ProcessLine('#include "Geant4/G4ProcessTable.hh"')
- mygMC = ROOT.TGeant4.GetMC()
- mygMC.ProcessGeantCommand("/process/inactivate muPairProd")
- mygMC.ProcessGeantCommand("/process/inactivate muBrems")
- mygMC.ProcessGeantCommand("/process/inactivate muIoni")
- mygMC.ProcessGeantCommand("/process/inactivate muonNuclear")
- mygMC.ProcessGeantCommand("/particle/select mu+")
- mygMC.ProcessGeantCommand("/particle/process/dump")
- gProcessTable = ROOT.G4ProcessTable.GetProcessTable()
- procmu = gProcessTable.FindProcess(ROOT.G4String('muIoni'),ROOT.G4String('mu+'))
- procmu.SetVerboseLevel(2)
 # -----Start run----------------------------------------------------
 run.Run(options.nEvents)
 # -----Runtime database---------------------------------------------
@@ -583,10 +549,10 @@ rtdb.saveOutput()
 rtdb.printParamContexts()
 getattr(rtdb,"print")()
 # ------------------------------------------------------------------------
-run.CreateGeometryFile("%s/geofile_full.%s.root" % (options.outputDir, tag))
+run.CreateGeometryFile(f"{options.outputDir}/geofile_full.{tag}.root")
 # save ShipGeo dictionary in geofile
 import saveBasicParameters
-saveBasicParameters.execute("%s/geofile_full.%s.root" % (options.outputDir, tag),ship_geo)
+saveBasicParameters.execute(f"{options.outputDir}/geofile_full.{tag}.root",ship_geo)
 
 # checking for overlaps
 if options.debug == 2:
@@ -603,7 +569,7 @@ timer.Stop()
 rtime = timer.RealTime()
 ctime = timer.CpuTime()
 print(' ')
-print("Macro finished succesfully.")
+print("Macro finished successfully.")
 if "P8gen" in globals() :
     if (HNL): print("number of retries, events without HNL ",P8gen.nrOfRetries())
     elif (options.DarkPhoton):
@@ -624,7 +590,7 @@ if simEngine == "MuonBack":
     nm = ff.GetName().split('/')
     if nm[len(nm)-1] == check: fin = ff
  if not fin: fin   = ROOT.TFile.Open(outFile)
- t     = fin.cbmsim
+ t = fin.Get("cbmsim")
  fout  = ROOT.TFile(tmpFile,'recreate')
  fSink = ROOT.FairRootFileSink(fout)
 
@@ -657,6 +623,8 @@ if simEngine == "MuonBack":
  branches.Add(ROOT.TObjString('smuonPoint'))
  branches.Add(ROOT.TObjString('TimeDetPoint'))
  branches.Add(ROOT.TObjString('MCEventHeader'))
+ branches.Add(ROOT.TObjString('UpstreamTaggerPoint'))
+ branches.Add(ROOT.TObjString('MTCdetPoint'))
  branches.Add(ROOT.TObjString('sGeoTracks'))
 
  sTree.AutoSave()
@@ -668,6 +636,37 @@ if simEngine == "MuonBack":
  rc1 = os.system("rm  "+outFile)
  rc2 = os.system("mv "+tmpFile+" "+outFile)
  fin.SetWritable(False) # bpyass flush error
+
+if simEngine == "muonDIS":
+
+    temp_filename = outFile.replace(".root", "_tmp.root")
+
+    with (
+        ROOT.TFile.Open(outFile, "read") as f_outputfile,
+        ROOT.TFile.Open(inputFile, "read") as f_muonfile,
+        ROOT.TFile.Open(temp_filename, "recreate") as f_temp,
+    ):
+        output_tree = f_outputfile.Get("cbmsim")
+
+        muondis_tree = f_muonfile.Get("DIS")
+
+        new_tree = output_tree.CloneTree(0)
+
+        cross_section = array("f", [0.0])
+        cross_section_leaf = new_tree.Branch(
+            "CrossSection", cross_section, "CrossSection/F"
+        )
+
+        for output_event, muondis_event in zip(output_tree, muondis_tree):
+            mu = muondis_event.InMuon[0]
+            cross_section[0] = mu[10]
+            new_tree.Fill()
+
+        new_tree.Write("", ROOT.TObject.kOverwrite)
+
+    os.replace(temp_filename, outFile)
+    print("Successfully added DISCrossSection to the output file:", outFile)
+
 # ------------------------------------------------------------------------
 import checkMagFields
 def visualizeMagFields():

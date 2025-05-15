@@ -49,11 +49,11 @@ def run(inFileName  = 'test07_10cm_grid.table',
 
 def createTextMap(inFileName, outFileName):
 
-    print('Creating text map {0} from {1}'.format(outFileName, inFileName))
+    print(f'Creating text map {outFileName} from {inFileName}')
 
     tmpFileName = 'tmpFile.txt'
 
-    inFile = open(inFileName, 'r')
+    inFile = open(inFileName)
     tmpFile = open(tmpFileName, 'w')
 
     iLine = 0
@@ -107,7 +107,7 @@ def createTextMap(inFileName, outFileName):
 
             # Write out the new line. Just print out the B field components, since we
             # can infer x,y,z co-ords from the ordering
-            newLine = '{0} {1} {2}\n'.format(BxWord, ByWord, BzWord)
+            newLine = f'{BxWord} {ByWord} {BzWord}\n'
             #newLine = '{0:.0f} {1:.0f} {2:.0f} {3:.3e} {4:.3e} {5:.3e}\n'.format(x,y,z,Bx,By,Bz)
             tmpFile.write(newLine)
 
@@ -146,18 +146,18 @@ def createTextMap(inFileName, outFileName):
                 dz = z - zOld
                 gotdz = 1
 
-    print('dx = {0}, dy = {1}, dz = {2}'.format(dx,dy,dz))
-    print('x = {0} to {1}, y = {2} to {3}, z = {4} to {5}'.format(xMin, xMax, yMin, yMax, zMin, zMax))
+    print(f'dx = {dx}, dy = {dy}, dz = {dz}')
+    print(f'x = {xMin} to {xMax}, y = {yMin} to {yMax}, z = {zMin} to {zMax}')
 
     tmpFile.close()
     inFile.close()
 
     # Write out the map containing the co-ordinate ranges and offsets etc
-    tmpFile2 = open(tmpFileName, 'r')
+    tmpFile2 = open(tmpFileName)
     outFile = open(outFileName, 'w')
 
-    outLine = 'CLimits {0:.0f} {1:.0f} {2:.0f} {3:.0f} {4:.0f} {5:.0f} ' \
-        '{6:.0f} {7:.0f} {8:.0f}\n'.format(xMin, xMax, dx, yMin, yMax, dy, zMin, zMax, dz)
+    outLine = 'CLimits {:.0f} {:.0f} {:.0f} {:.0f} {:.0f} {:.0f} ' \
+        '{:.0f} {:.0f} {:.0f}\n'.format(xMin, xMax, dx, yMin, yMax, dy, zMin, zMax, dz)
     outFile.write(outLine)
 
     #outLine = 'Offsets {0:.0f} {1:.0f} {2:.0f}\n'.format(ox, oy, oz)
@@ -183,7 +183,7 @@ def formatNumber(x):
 
     # Let the general precision be 0.01 mT. Anything below this
     # is set to zero.
-    xWord = '{0:.5f}'.format(x)
+    xWord = f'{x:.5f}'
 
     if abs(x) < 1e-5:
 
@@ -194,7 +194,7 @@ def formatNumber(x):
 
 def createRootMap(inFileName, outFileName):
 
-    print('Create ROOT map {0} from {1}'.format(outFileName, inFileName))
+    print(f'Create ROOT map {outFileName} from {inFileName}')
 
     # Define ROOT file and its TTree
     theFile = ROOT.TFile.Open(outFileName, 'recreate')
@@ -204,15 +204,15 @@ def createRootMap(inFileName, outFileName):
 
     # Co-ordinate ranges
     rStruct = ROOT.rangeStruct()
-    rangeTree.Branch('xMin', ROOT.AddressOf(rStruct, 'xMin'), 'xMin/F')
-    rangeTree.Branch('xMax', ROOT.AddressOf(rStruct, 'xMax'), 'xMax/F')
-    rangeTree.Branch('dx', ROOT.AddressOf(rStruct, 'dx'), 'dx/F')
-    rangeTree.Branch('yMin', ROOT.AddressOf(rStruct, 'yMin'), 'yMin/F')
-    rangeTree.Branch('yMax', ROOT.AddressOf(rStruct, 'yMax'), 'yMax/F')
-    rangeTree.Branch('dy', ROOT.AddressOf(rStruct, 'dy'), 'dy/F')
-    rangeTree.Branch('zMin', ROOT.AddressOf(rStruct, 'zMin'), 'zMin/F')
-    rangeTree.Branch('zMax', ROOT.AddressOf(rStruct, 'zMax'), 'zMax/F')
-    rangeTree.Branch('dz', ROOT.AddressOf(rStruct, 'dz'), 'dz/F')
+    rangeTree.Branch('xMin', ROOT.addressof(rStruct, 'xMin'), 'xMin/F')
+    rangeTree.Branch('xMax', ROOT.addressof(rStruct, 'xMax'), 'xMax/F')
+    rangeTree.Branch('dx', ROOT.addressof(rStruct, 'dx'), 'dx/F')
+    rangeTree.Branch('yMin', ROOT.addressof(rStruct, 'yMin'), 'yMin/F')
+    rangeTree.Branch('yMax', ROOT.addressof(rStruct, 'yMax'), 'yMax/F')
+    rangeTree.Branch('dy', ROOT.addressof(rStruct, 'dy'), 'dy/F')
+    rangeTree.Branch('zMin', ROOT.addressof(rStruct, 'zMin'), 'zMin/F')
+    rangeTree.Branch('zMax', ROOT.addressof(rStruct, 'zMax'), 'zMax/F')
+    rangeTree.Branch('dz', ROOT.addressof(rStruct, 'dz'), 'dz/F')
 
     dataTree = ROOT.TTree('Data', 'Data')
     dataTree.SetDirectory(theFile)
@@ -222,9 +222,9 @@ def createRootMap(inFileName, outFileName):
     # the field bin = (iX*Ny + iY)*Nz + iZ, where Ny and Nz are the number
     # of y and z bins
     dStruct = ROOT.dataStruct()
-    dataTree.Branch('Bx', ROOT.AddressOf(dStruct, 'Bx'), 'Bx/F')
-    dataTree.Branch('By', ROOT.AddressOf(dStruct, 'By'), 'By/F')
-    dataTree.Branch('Bz', ROOT.AddressOf(dStruct, 'Bz'), 'Bz/F')
+    dataTree.Branch('Bx', ROOT.addressof(dStruct, 'Bx'), 'Bx/F')
+    dataTree.Branch('By', ROOT.addressof(dStruct, 'By'), 'By/F')
+    dataTree.Branch('Bz', ROOT.addressof(dStruct, 'Bz'), 'Bz/F')
 
     # Open text file and process the information
     iLine = 0
@@ -235,7 +235,7 @@ def createRootMap(inFileName, outFileName):
     Nz = 0
     Nzy = 0
 
-    with open(inFileName, 'r') as f:
+    with open(inFileName) as f:
 
         for line in f:
             iLine += 1
@@ -258,7 +258,7 @@ def createRootMap(inFileName, outFileName):
                 Nz = int(((rStruct.zMax - rStruct.zMin)/rStruct.dz) + 1.0)
                 Nzy = Nz*Ny
 
-                print('Nx = {0}, Ny = {1}, Nz = {2}'.format(Nx, Ny, Nz))
+                print(f'Nx = {Nx}, Ny = {Ny}, Nz = {Nz}')
 
                 rangeTree.Fill()
 

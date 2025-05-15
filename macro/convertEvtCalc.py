@@ -19,7 +19,7 @@ def parse_file(infile):
     tuple: A tuple containing process type (str), sample points (int), and a list of numpy arrays for each variable.
     """
     try:
-        with open(infile, "r") as file:
+        with open(infile) as file:
             lines = file.readlines()
             lines = lines[2:]
 
@@ -93,11 +93,11 @@ def convert_file(infile, outdir):
         "vz",
     ]
     daughter_vars = [
-        "px_prod", 
-        "py_prod", 
-        "pz_prod", 
-        "e_prod", 
-        "mass_prod", 
+        "px_prod",
+        "py_prod",
+        "pz_prod",
+        "e_prod",
+        "mass_prod",
         "pdg_prod",
     ]
     fname = infile.split("/")[-1]
@@ -114,7 +114,7 @@ def convert_file(infile, outdir):
     ncols   = len(parsed_data[0][2])
     nvardau = 6  # qualifiers for each daughter
     remaining_vars = ncols - len(vars_names)
-    
+
     if (remaining_vars % nvardau)!=0:
         raise ValueError(f"- convertEvtCalc - Error: number of daughters is not exact.")
 
@@ -185,4 +185,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

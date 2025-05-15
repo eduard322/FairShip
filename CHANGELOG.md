@@ -14,13 +14,72 @@ it in future.
 
 ### Added
 
+* feat(python): Add experimental script to compare histograms
+* feat(python): Add experimental script to check overlaps quickly
+* **Corrections in MuonDIS simulation**
+  The DIS interactions are now time-shifted to be consistent with the original incoming muon. Additionally, tracks from soft interactions of the original muon along with the muon's veto response are preserved (in muonDis.root) and included up to the DIS interaction point. To be noted that the muon veto points are manually added using add_muonresponse.py, which modifies the simulation file. This replaces the old method of "backward-travelling muon" to generate the incoming muon's veto response. All MuonDIS simulation scripts have been updated and consolidated within FairShip/muonDIS, ensuring consistency for new productions.
+* Added a custom CrossSection branch to the simulation file to save the DIS cross sections from muonDIS.
+* Added new warm muon shield `warm_opt` in geometry_config
+* Added new parameters to muon shield to support configurations from current optimisation campaign
+* Added event_inspector class to experimental analysis_toolkit to streamline usage of helper functions; Added dump_event() as a start.
+* Add (optional) MgB2 field map
+* ShipBFieldMap: Added LOG info and fatal
+* Folder ```SND``` is added for new versions of SND integrated to the Muon Shield
+* First version of ```MTC``` (```SND/MTC```) is introduced. Scint part is fully implemented, the Sci-Fi part is implemented in simplified version. Geometrical parameters of ```MTC``` are stored in ```geometry/MTC_config.yaml``` file
+* New key for ```macro/run_simScript.py``` for choosing SND options is added: ```--SND_design```
+
 ### Fixed
 
-### Added
+* chore: Fix file endings
+* chore: trim trailing whitespace
+* Fix mismatch dimension cavern ECN3 TCC8
+* fix: use standard library to expand env
+* fix: autoload Pythia8 instead of manually loading in run_simScript.py
+* fix(geometry): fix typo of "vacuums" for strawtubes medium
+* fix(reco): Fix segmentation fault due to dummy containers (#453, #519)
+* fix: don't use TFile's deprecated attribute syntax
+* fix(digi): Fix logic of SST digitisation (#662)
+* Fix double append of recognized stracks
+* fix(ShieldUtils.py): The fieldmap offset was calibrated with the old version of MS
+* fix(ShieldUtils.py): changing code to be more pythonic, adding new element in the output tuple -- the list of the Muon Shield magnet z-coordinates, that can be used to set a location of SND inside the Muon Shield
+* fix(shipDet_conf.py): changing paths to yaml files to more pythonic (```os.path.join()``` now)
+* Fix splitcal strip dimensions and number of modules
 
 ### Changed
 
+* Don't special case EOS paths (fix #566)
+* Setting up the Muon shield geometry by ROOT files is completely replaced with the temporary solution of dict in the `geometry/geometry_config.py`.
+* Set up of the shield name is now done using the `--shieldName` flag instead of `--scName`.
+* Allow using standalone TPythia for use with ROOT 6.32+
+* Use git-lfs to track ROOT files
+* shipDet_conf behaviour no longer depends on the muon shield version.
+* feat(digi): Use STL vectors for SST digitisation
+* feat(digi): Use STL vectors for SBT digitisation
+* Change max x of stereo hits to match straw length
+* Get rid of straw diameter dependency in scale factor
+* Assume all tracks are muons during track fit (avoid using MC truth)
+* Change of UBT geometry, remove implementation of RPC and setting a new scoring plane of 4×6 m
+* Allow specifying spectrometer field map
+* Obtain tauMuDet z position from muonshield position and length, instead of chamber trackers
+* Update tracker station z positions, fix UBT, TimeDet & SplitCal position (s. integration layout EDMS 3287817 v1)
+* feat(geometry): Make SplitCal the default calorimeter
+* Resize SplitCal to 4×6 m²
+
 ### Removed
+
+* fix: Remove unused, unrunnable shipPatRec_prev.py
+* feat(geometry): Dropped support for old geometries without DecayVolumeMedium explicitly set(pre 24.11 release case).
+* MS: Removed old options 7, 9, 10
+* MS: Removed cobalt option
+* MS: Removed stepGeo option
+* MS: Removed the flag constant field in Absorber (HS) -> fixed to 1.7 T
+* MS: run_simScript.py: The --noSC flag is removed, whether or not a configuration is SC hybrid depends on the config selected. Configurations are defined in the shield_db in geometry_config.py
+* Removed old nuTauTargetDesign configurations from 0 to 2. Currently supported: 3 (2018, magnetized target) and 4 (Current, not magnetized target and spectrometer)
+* build(field,nutaudet): remove unnecessary ROOT_INCLUDE_DIR include
+* feat(geometry): Remove 2018, 2022 global designs
+* run_simScript.py: remove --muShieldDesign flag
+* Remove unused straw veto station
+* ShipAna.py: remove broken calorimetry
 
 ## 25.01
 
@@ -37,6 +96,7 @@ it in future.
 * Genfit measurements now give the correct detector ID
 * Fix TEvePointSetPrintOut
 * Event Display: Fix drawing of MC and Geo tracks
+* AddressOf is outdated function in ROOT, changed with addressof (in field/)
 
 ### Changed
 * Changed the dimension of the cave (ref. https://indico.cern.ch/event/1507466/contributions/6345273/attachments/3003438/5293503/Quick%20Update%20on%20FAIRSHIP%20geometry-1.pdf):

@@ -1,9 +1,9 @@
 #!/usr/bin/env python
-# -*- coding: latin-1 -*-
 import ROOT
 import os
 import shipunit as u
 from ShipGeoConfig import AttrDict, ConfigRegistry
+from ShieldUtils import find_shield_center
 from array import array
 import yaml
 
@@ -90,9 +90,182 @@ def posEcal(z, efile):
     ecal = ROOT.ecal("Ecal", ROOT.kTRUE, sz)
     return ecal, EcalZSize
 
+def configure_snd_old(yaml_file,
+                      snd_tauMu_zTot,
+                      snd_tauMu_zMudetC,
+                      cave_floorHeightMuonShield):
+
+    with open(yaml_file) as file:
+        config = yaml.safe_load(file)
+
+    tauMu_geo = AttrDict(config['tauMu'])
+    nuTarget_geo = AttrDict(config['nuTarget'])
+    nuTauTT_geo = AttrDict(config['nuTauTT'])
+
+    #specific parameters
+    #tauMu det
+    snd_tauMu_Xtot = tauMu_geo.XRpc + 2*tauMu_geo.XRyoke
+    snd_tauMu_Ytot = tauMu_geo.YRpc + 2*(tauMu_geo.CoilH+tauMu_geo.YRyoke)
+    # nu Target Tracker
+    snd_nuTauTT_TTX = nuTauTT_geo.n_hor_planes * nuTauTT_geo.scifimat_width + 2.9 * u.cm  # endpieces (~2.9cm from previous geom)
+    snd_nuTauTT_TTY = nuTauTT_geo.n_vert_planes * nuTauTT_geo.scifimat_width + 2.9 # u.cm  # endpieces (~2.9cm from previous geom)
+
+    snd_nuTauTT_TTZ = 2 * nuTauTT_geo.support_z + 2 * nuTauTT_geo.scifimat_z + nuTauTT_geo.honeycomb_z
+
+    # nuTau target
+    snd_nuTarget_BrZ = nuTarget_geo.n_plates * nuTarget_geo.LeadTh + (nuTarget_geo.n_plates+1) * (2* nuTarget_geo.EmTh + nuTarget_geo.PBTh) + nuTarget_geo.BrPackZ
+    snd_nuTarget_BrX = nuTarget_geo.BrPackX + nuTarget_geo.EmX
+    snd_nuTarget_BrY = nuTarget_geo.BrPackY + nuTarget_geo.EmY
+
+    snd_nuTarget_zdim = nuTarget_geo.wall* snd_nuTarget_BrZ + (nuTarget_geo.wall+1)*snd_nuTauTT_TTZ
+    snd_nuTarget_xdim = snd_nuTauTT_TTX
+    snd_nuTarget_ydim = snd_nuTauTT_TTY
+
+    snd_nuTarget_zC = snd_tauMu_zMudetC - snd_tauMu_zTot/2 - 20*u.cm - snd_nuTarget_zdim/2.
+
+    snd_nuTarget_PillarY = 10*u.m - snd_nuTarget_ydim/2 -nuTarget_geo.BaseY- 0.1*u.mm - cave_floorHeightMuonShield
+
+    taumuondetector = ROOT.NuTauMudet(
+        "NuTauMudet", snd_tauMu_zMudetC, ROOT.kTRUE
+    )
+    taumuondetector.SetDesign(4)
+    taumuondetector.SetTotDimensions(
+        snd_tauMu_Xtot, snd_tauMu_Ytot, snd_tauMu_zTot
+    )
+    taumuondetector.SetRpcDimensions(
+        tauMu_geo.XRpc,
+        tauMu_geo.YRpc,
+        tauMu_geo.ZRpc,
+    )
+    taumuondetector.SetGapMiddle(tauMu_geo.GapM)
+    taumuondetector.SetMagneticField(tauMu_geo.B)
+    taumuondetector.SetReturnYokeDimensions(
+        tauMu_geo.XRyoke,
+        tauMu_geo.YRyoke,
+        snd_tauMu_zTot,
+    )
+    taumuondetector.SetCoilParameters(
+        tauMu_geo.CoilH, tauMu_geo.CoilW, 1, 0.0
+    )  # for now, only containers
+    detectorList.append(taumuondetector)
+
+
+    NuTauTarget = ROOT.Target(
+        "NuTauTarget", nuTarget_geo.Ydist, ROOT.kTRUE
+    )
+    NuTauTarget.MakeNuTargetPassive(nuTarget_geo.nuTargetPassive)
+    NuTauTarget.MergeTopBot(nuTarget_geo.SingleEmFilm)
+    NuTauTarget.SetDetectorDesign(nuTarget_geo.Design)
+    NuTauTarget.SetCenterZ(snd_nuTarget_zC)
+    NuTauTarget.SetNumberBricks(
+        nuTarget_geo.col,
+        nuTarget_geo.row,
+        nuTarget_geo.wall,
+    )
+    NuTauTarget.SetDetectorDimension(
+        snd_nuTarget_xdim,
+        snd_nuTarget_ydim,
+        snd_nuTarget_zdim,
+    )
+    NuTauTarget.SetTargetWallDimension(
+        nuTarget_geo.col*snd_nuTarget_BrX,
+        nuTarget_geo.row*snd_nuTarget_BrY+(nuTarget_geo.row-1)*nuTarget_geo.Ydist,
+        snd_nuTarget_BrZ
+    )
+    NuTauTarget.SetEmulsionParam(
+        nuTarget_geo.EmTh,
+        nuTarget_geo.EmX,
+        nuTarget_geo.EmY,
+        nuTarget_geo.PBTh,
+        2* nuTarget_geo.EmTh + nuTarget_geo.PBTh,
+        nuTarget_geo.LeadTh,
+        nuTarget_geo.LeadTh +2* nuTarget_geo.EmTh + nuTarget_geo.PBTh,
+    )
+    NuTauTarget.SetBrickParam(
+        snd_nuTarget_BrX,
+        snd_nuTarget_BrY,
+        snd_nuTarget_BrZ,
+        nuTarget_geo.BrPackX,
+        nuTarget_geo.BrPackY,
+        nuTarget_geo.BrPackZ,
+        nuTarget_geo.n_plates,
+    )
+    NuTauTarget.SetCESParam(
+        nuTarget_geo.RohG,
+        nuTarget_geo.LayerCESW,
+        nuTarget_geo.CESW,
+        nuTarget_geo.CESPack,
+    )
+    NuTauTarget.SetCellParam(snd_nuTarget_BrZ)
+    NuTauTarget.SetPillarDimension(
+        nuTarget_geo.PillarX,
+        snd_nuTarget_PillarY,
+        nuTarget_geo.PillarZ
+    )
+    NuTauTarget.SetBaseDimension(
+        snd_nuTarget_xdim+20,
+        nuTarget_geo.BaseY,
+        snd_nuTarget_zdim+10
+    )
+
+    # Target Tracker
+    NuTauTT = ROOT.TargetTracker(
+        "TargetTrackers",
+        snd_nuTauTT_TTX,
+        snd_nuTauTT_TTY,
+        snd_nuTauTT_TTZ,
+        ROOT.kTRUE,
+    )
+    NuTauTT.SetDesign(nuTauTT_geo.design)
+    NuTauTT.SetSciFiParam(
+        nuTauTT_geo.scifimat_width,
+        snd_nuTauTT_TTX,
+        snd_nuTauTT_TTY,
+        nuTauTT_geo.scifimat_z,
+        nuTauTT_geo.support_z,
+        nuTauTT_geo.honeycomb_z,
+    )
+    NuTauTT.SetNumberSciFi(
+        nuTauTT_geo.n_hor_planes, nuTauTT_geo.n_vert_planes
+    )
+    NuTauTT.SetTargetTrackerParam(
+        snd_nuTauTT_TTX, snd_nuTauTT_TTY, snd_nuTauTT_TTZ
+    )
+    NuTauTT.SetBrickParam(snd_nuTarget_BrZ)
+    NuTauTT.SetTotZDimension(snd_nuTarget_zdim)
+    NuTauTT.SetNumberTT(nuTarget_geo.wall+1)
+    # method of nutau target that must be called after TT parameter definition
+    NuTauTarget.SetTTzdimension(snd_nuTauTT_TTZ)
+
+    detectorList.append(NuTauTarget)
+    detectorList.append(NuTauTT)
+
+
+def configure_snd_mtc(yaml_file, ship_geo):
+    with open(yaml_file) as file:
+        config = yaml.safe_load(file)
+
+    mtc_geo = AttrDict(config['MTC'])
+    # Initialize detector
+    if mtc_geo.zPosition == "auto":
+        # Get the the center of the *last* magnet
+        mtc_geo.zPosition = find_shield_center(ship_geo)[2][-1]
+        print("MTC zPosition set to ", mtc_geo.zPosition)
+    mtc = ROOT.MTCDetector("MTC", ROOT.kTRUE)
+    mtc.SetMTCParameters(
+        mtc_geo.width,
+        mtc_geo.height,
+        mtc_geo.ironThick,
+        mtc_geo.sciFiThick,
+        mtc_geo.scintThick,
+        mtc_geo.nLayers,
+        mtc_geo.zPosition,
+        mtc_geo.fieldY
+    )
+    detectorList.append(mtc)
 
 def configure_veto(yaml_file):
-    with open(yaml_file, "r") as file:
+    with open(yaml_file) as file:
         config = yaml.safe_load(file)
 
     veto_geo = AttrDict(config)
@@ -126,7 +299,9 @@ def configure_veto(yaml_file):
 def configure(run, ship_geo):
     # ---- for backward compatibility ----
     if not hasattr(ship_geo, "DecayVolumeMedium"):
-        ship_geo.DecayVolumeMedium = "vacuums"
+        raise ValueError(
+            "DecayVolumeMedium is not defined, possibly old (incompatible) geometry!"
+        )
     if not hasattr(ship_geo, "tankDesign"):
         ship_geo.tankDesign = 5
     if not hasattr(ship_geo, "muShieldGeo"):
@@ -140,23 +315,20 @@ def configure(run, ship_geo):
         ship_geo.cave.floorHeightMuonShield = 5 * u.m
         ship_geo.cave.floorHeightTankA = 4.5 * u.m
         ship_geo.cave.floorHeightTankB = 2.0 * u.m
-    if not hasattr(ship_geo, "NuTauTT"):
-        ship_geo.NuTauTT = AttrDict(z=0 * u.cm)
-    if not hasattr(ship_geo.NuTauTT, "design"):
-        ship_geo.NuTauTT.design = 0
     if not hasattr(ship_geo, "EcalOption"):
         ship_geo.EcalOption = 1
     if not hasattr(ship_geo, "SND"):
         ship_geo.SND = True
+
     latestShipGeo = ConfigRegistry.loadpy(
         "$FAIRSHIP/geometry/geometry_config.py",
         Yheight=ship_geo.Yheight / u.m,
         tankDesign=ship_geo.tankDesign,
-        muShieldDesign=ship_geo.muShieldDesign,
         nuTauTargetDesign=ship_geo.nuTauTargetDesign,
         muShieldGeo=ship_geo.muShieldGeo,
         SC_mag=ship_geo.SC_mag,
-        scName=ship_geo.scName,
+        shieldName=ship_geo.shieldName,
+        DecayVolumeMedium=ship_geo.DecayVolumeMedium,
     )
     # -----Create media-------------------------------------------------
     run.SetMaterials("media.geo")  # Materials
@@ -170,29 +342,14 @@ def configure(run, ship_geo):
         cave.SetGeometryFileName("caveWithAir.geo")
     detectorList.append(cave)
 
-    if ship_geo.muShieldDesign in [
-        7,
-        8,
-        9,
-        10,
-    ]:  # magnetized hadron absorber defined in ShipMuonShield
-        TargetStation = ROOT.ShipTargetStation(
-            "TargetStation",
-            ship_geo.target.length,
-            ship_geo.target.z,
-            ship_geo.targetOpt,
-            ship_geo.target.sl,
-        )
-    else:
-        TargetStation = ROOT.ShipTargetStation(
-            "TargetStation",
-            ship_geo.target.length,
-            ship_geo.hadronAbsorber.length,
-            ship_geo.target.z,
-            ship_geo.hadronAbsorber.z,
-            ship_geo.targetOpt,
-            ship_geo.target.sl,
-        )
+    # magnetized hadron absorber defined in ShipMuonShield
+    TargetStation = ROOT.ShipTargetStation(
+        "TargetStation",
+        ship_geo.target.length,
+        ship_geo.target.z,
+        ship_geo.targetOpt,
+        ship_geo.target.sl,
+    )
 
     if ship_geo.targetOpt > 10:
         slices_length = ROOT.std.vector("float")()
@@ -203,53 +360,15 @@ def configure(run, ship_geo):
         TargetStation.SetLayerPosMat(ship_geo.target.xy, slices_length, slices_material)
     detectorList.append(TargetStation)
 
-    if ship_geo.muShieldDesign in [7, 9]:
-        MuonShield = ROOT.ShipMuonShield(
-            "MuonShield",
-            ship_geo.muShieldDesign,
-            "ShipMuonShield",
-            ship_geo.muShield.z,
-            ship_geo.muShield.dZ0,
-            ship_geo.muShield.dZ1,
-            ship_geo.muShield.dZ2,
-            ship_geo.muShield.dZ3,
-            ship_geo.muShield.dZ4,
-            ship_geo.muShield.dZ5,
-            ship_geo.muShield.dZ6,
-            ship_geo.muShield.dZ7,
-            ship_geo.muShield.dZ8,
-            ship_geo.muShield.dXgap,
-            ship_geo.muShield.LE,
-            ship_geo.Yheight * 4.0 / 10.0,
-            ship_geo.cave.floorHeightMuonShield,
-            ship_geo.muShield.Field,
-            ship_geo.muShieldWithCobaltMagnet,
-            ship_geo.muShieldStepGeo,
-            ship_geo.hadronAbsorber.WithConstField,
-            ship_geo.muShield.WithConstField,
-        )
-    elif ship_geo.muShieldDesign == 8:
-        if not ship_geo.SC_mag:
-            MuonShield = ROOT.ShipMuonShield(
-                ship_geo.muShieldGeo,
-                ship_geo.cave.floorHeightMuonShield,
-                ship_geo.muShieldWithCobaltMagnet,
-                ship_geo.muShieldStepGeo,
-                ship_geo.hadronAbsorber.WithConstField,
-                ship_geo.muShield.WithConstField,
-            )
-        else:
-            in_params = ROOT.TVectorD(
-                len(ship_geo.muShield.params), array("d", ship_geo.muShield.params)
-            )
-            MuonShield = ROOT.ShipMuonShield(
-                in_params,
-                ship_geo.cave.floorHeightMuonShield,
-                ship_geo.muShieldWithCobaltMagnet,
-                ship_geo.muShieldStepGeo,
-                ship_geo.hadronAbsorber.WithConstField,
-                ship_geo.muShield.WithConstField,
-            )
+
+    in_params = list(ship_geo.muShield.params)
+
+    MuonShield = ROOT.ShipMuonShield(
+        in_params,
+        ship_geo.cave.floorHeightMuonShield,
+        ship_geo.muShield.WithConstField,
+        ship_geo.SC_mag
+    )
     detectorList.append(MuonShield)
 
     if not hasattr(ship_geo, "magnetDesign"):
@@ -264,9 +383,7 @@ def configure(run, ship_geo):
         ship_geo.Bfield.YokeDepth = 200.0 * u.cm
         ship_geo.Bfield.CoilThick = 25.0 * u.cm
     # sanity check, 2018 layout ship_geo.tankDesign == 6 has to be together with ship_geo.nuTauTargetDesign == 3
-    if (ship_geo.tankDesign == 6 and ship_geo.nuTauTargetDesign < 3) or (
-        ship_geo.tankDesign != 6 and ship_geo.nuTauTargetDesign == 3
-    ):
+    if ship_geo.tankDesign != 6 and ship_geo.nuTauTargetDesign == 3:
         print(
             "version of tankDesign and nuTauTargetDesign are not compatible, should be 6 and 3, it is ",
             ship_geo.tankDesign,
@@ -307,383 +424,32 @@ def configure(run, ship_geo):
 
     if ship_geo.DecayVolumeMedium == "helium":
         configure_veto(
-            fairship + "/geometry/veto_config_helium.yaml"
+            os.path.join(fairship, "geometry", "veto_config_helium.yaml")
         )  # put conditions for the design
     if ship_geo.DecayVolumeMedium == "vacuums":
         configure_veto(
-            fairship + "/geometry/veto_config_vacuums.yaml"
+            os.path.join(fairship, "geometry", "veto_config_vacuums.yaml")
         )  # put conditions for the design
 
-    if hasattr(ship_geo, "tauMudet") and ship_geo.SND:  # don't support old designs
-        if ship_geo.muShieldDesign >= 7 and hasattr(ship_geo.tauMudet, "Xtot"):
-            taumuondetector = ROOT.NuTauMudet(
-                "NuTauMudet", ship_geo.tauMudet.zMudetC, ROOT.kTRUE
+    # For SND
+    if ship_geo.SND:
+        if ship_geo.SND_design == 2:
+            # SND design 2 -- MTC
+            configure_snd_mtc(
+                os.path.join(fairship, "geometry", "MTC_config.yaml"),
+                ship_geo
             )
-            taumuondetector.SetDesign(ship_geo.nuTauTargetDesign)
-            taumuondetector.SetTotDimensions(
-                ship_geo.tauMudet.Xtot, ship_geo.tauMudet.Ytot, ship_geo.tauMudet.Ztot
-            )
-            if ship_geo.nuTauTargetDesign < 4:  # muon filter design
-                if hasattr(ship_geo.tauMudet, "ZFethin"):
-                    taumuondetector.SetFeDimensions(
-                        ship_geo.tauMudet.XFe,
-                        ship_geo.tauMudet.YFe,
-                        ship_geo.tauMudet.ZFethick,
-                        ship_geo.tauMudet.ZFethin,
-                    )
-                    taumuondetector.SetNFeInArm(
-                        ship_geo.tauMudet.NFethick, ship_geo.tauMudet.NFethin
-                    )
-                    taumuondetector.SetLateralCutSize(
-                        ship_geo.tauMudet.CutHeight, ship_geo.tauMudet.CutLength
-                    )
-                    taumuondetector.SetSupportTransverseDimensions(
-                        ship_geo.tauMudet.UpperSupportX,
-                        ship_geo.tauMudet.UpperSupportY,
-                        ship_geo.tauMudet.LowerSupportX,
-                        ship_geo.tauMudet.LowerSupportY,
-                        ship_geo.tauMudet.LateralSupportX,
-                        ship_geo.tauMudet.LateralSupportY,
-                        ship_geo.tauMudet.YSpacing,
-                    )
-                else:  # geometry used before new iron sampling
-                    taumuondetector.SetFeDimensions(
-                        ship_geo.tauMudet.XFe,
-                        ship_geo.tauMudet.YFe,
-                        ship_geo.tauMudet.ZFe,
-                    )
-                    taumuondetector.SetNFeInArm(ship_geo.tauMudet.NFe)
-                taumuondetector.SetRpcDimensions(
-                    ship_geo.tauMudet.XRpc,
-                    ship_geo.tauMudet.YRpc,
-                    ship_geo.tauMudet.ZRpc,
-                )
-                taumuondetector.SetRpcGasDimensions(
-                    ship_geo.tauMudet.XGas,
-                    ship_geo.tauMudet.YGas,
-                    ship_geo.tauMudet.ZGas,
-                )
-                taumuondetector.SetRpcStripDimensions(
-                    ship_geo.tauMudet.XStrip,
-                    ship_geo.tauMudet.YStrip,
-                    ship_geo.tauMudet.ZStrip,
-                )
-                taumuondetector.SetRpcElectrodeDimensions(
-                    ship_geo.tauMudet.XEle,
-                    ship_geo.tauMudet.YEle,
-                    ship_geo.tauMudet.ZEle,
-                )
-                taumuondetector.SetRpcPETDimensions(
-                    ship_geo.tauMudet.XPet,
-                    ship_geo.tauMudet.YPet,
-                    ship_geo.tauMudet.ZPet,
-                )
-                taumuondetector.SetNRpcInArm(ship_geo.tauMudet.NRpc)
-                if ship_geo.nuTauTargetDesign == 3:
-                    taumuondetector.SetUpperCoverDimensions(
-                        ship_geo.tauMudet.XCov,
-                        ship_geo.tauMudet.YCov,
-                        ship_geo.tauMudet.ZCov,
-                    )
-                    taumuondetector.SetLateralCoverDimensions(
-                        ship_geo.tauMudet.XLateral,
-                        ship_geo.tauMudet.YLateral,
-                        ship_geo.tauMudet.ZLateral,
-                    )
-                    taumuondetector.SetCrossDimensions(
-                        ship_geo.tauMudet.XCross,
-                        ship_geo.tauMudet.YCross,
-                        ship_geo.tauMudet.ZCross,
-                        ship_geo.tauMudet.WidthArm,
-                    )
-                    taumuondetector.SetRpcOuterDimensions(
-                        ship_geo.tauMudet.XRpc_outer,
-                        ship_geo.tauMudet.YRpc_outer,
-                        ship_geo.tauMudet.ZRpc_outer,
-                    )
-                    taumuondetector.SetRpcInnerDimensions(
-                        ship_geo.tauMudet.XRpc_inner,
-                        ship_geo.tauMudet.YRpc_inner,
-                        ship_geo.tauMudet.ZRpc_inner,
-                    )
-                    taumuondetector.SetRpcGapDimensions(
-                        ship_geo.tauMudet.XRpcGap,
-                        ship_geo.tauMudet.YRpcGap,
-                        ship_geo.tauMudet.ZRpcGap,
-                    )
-                    taumuondetector.SetPillarDimensions(
-                        ship_geo.tauMudet.PillarX,
-                        ship_geo.tauMudet.PillarY,
-                        ship_geo.tauMudet.PillarZ,
-                    )
-                if ship_geo.nuTauTargetDesign == 3:
-                    if hasattr(
-                        ship_geo.tauMudet, "deltax"
-                    ):  # now replaced with veto taggers
-                        taumuondetector.SetRpcDimDifferences(
-                            ship_geo.tauMudet.deltax, ship_geo.tauMudet.deltay
-                        )
-                if ship_geo.nuTauTargetDesign < 3:
-                    taumuondetector.SetReturnYokeDimensions(
-                        ship_geo.tauMudet.XRyoke,
-                        ship_geo.tauMudet.YRyoke,
-                        ship_geo.tauMudet.ZRyoke,
-                    )
-                    taumuondetector.SetSmallerYokeDimensions(
-                        ship_geo.tauMudet.XRyoke_s,
-                        ship_geo.tauMudet.YRyoke_s,
-                        ship_geo.tauMudet.ZRyoke_s,
-                    )
-                    taumuondetector.SetZDimensionArm(ship_geo.tauMudet.ZArm)
-                    taumuondetector.SetGapDownstream(ship_geo.tauMudet.GapD)
-                    taumuondetector.SetGapMiddle(ship_geo.tauMudet.GapM)
-                    taumuondetector.SetMagneticField(ship_geo.tauMudet.B)
-                    taumuondetector.SetCoilParameters(
-                        ship_geo.tauMudet.CoilH,
-                        ship_geo.tauMudet.CoilW,
-                        ship_geo.tauMudet.N,
-                        ship_geo.tauMudet.CoilG,
-                    )
-
-            if (
-                ship_geo.nuTauTargetDesign == 4
-            ):  # magnetic field is back in taumuondetector for mufilter
-                taumuondetector.SetRpcDimensions(
-                    ship_geo.tauMudet.XRpc,
-                    ship_geo.tauMudet.YRpc,
-                    ship_geo.tauMudet.ZRpc,
-                )
-                taumuondetector.SetGapMiddle(ship_geo.tauMudet.GapM)
-                taumuondetector.SetMagneticField(ship_geo.tauMudet.B)
-                taumuondetector.SetReturnYokeDimensions(
-                    ship_geo.tauMudet.XRyoke,
-                    ship_geo.tauMudet.YRyoke,
-                    ship_geo.tauMudet.ZRyoke,
-                )
-                taumuondetector.SetCoilParameters(
-                    ship_geo.tauMudet.CoilH, ship_geo.tauMudet.CoilW, 1, 0.0
-                )  # for now, only containers
-            detectorList.append(taumuondetector)
-            if (
-                ship_geo.nuTauTargetDesign == 0
-                or ship_geo.nuTauTargetDesign == 1
-                or ship_geo.nuTauTargetDesign == 3
-            ):
-                EmuMagnet = ROOT.EmulsionMagnet(
-                    "EmuMagnet", ship_geo.EmuMagnet.zC, "EmulsionMagnet"
-                )
-                EmuMagnet.SetDesign(ship_geo.EmuMagnet.Design)
-                EmuMagnet.SetGaps(ship_geo.EmuMagnet.GapUp, ship_geo.EmuMagnet.GapDown)
-                EmuMagnet.SetMagneticField(ship_geo.EmuMagnet.B)
-                EmuMagnet.SetConstantField(ship_geo.EmuMagnet.WithConstField)
-                EmuMagnet.SetMagnetSizes(
-                    ship_geo.EmuMagnet.X, ship_geo.EmuMagnet.Y, ship_geo.EmuMagnet.Z
-                )
-                if ship_geo.nuTauTargetDesign == 0 or ship_geo.nuTauTargetDesign == 1:
-                    EmuMagnet.SetCoilParameters(
-                        ship_geo.EmuMagnet.Radius,
-                        ship_geo.EmuMagnet.Height1,
-                        ship_geo.EmuMagnet.Height2,
-                        ship_geo.EmuMagnet.Distance,
-                    )
-                if ship_geo.nuTauTargetDesign == 3:
-                    EmuMagnet.SetCoilParameters(
-                        ship_geo.EmuMagnet.CoilX,
-                        ship_geo.EmuMagnet.CoilY,
-                        ship_geo.EmuMagnet.Height1,
-                        ship_geo.EmuMagnet.Height2,
-                        ship_geo.EmuMagnet.Thickness,
-                    )
-                    EmuMagnet.SetCutDimensions(
-                        ship_geo.EmuMagnet.CutLength, ship_geo.EmuMagnet.CutHeight
-                    )
-                EmuMagnet.SetMagnetColumn(
-                    ship_geo.EmuMagnet.ColX,
-                    ship_geo.EmuMagnet.ColY,
-                    ship_geo.EmuMagnet.ColZ,
-                )
-                EmuMagnet.SetBaseDim(
-                    ship_geo.EmuMagnet.BaseX,
-                    ship_geo.EmuMagnet.BaseY,
-                    ship_geo.EmuMagnet.BaseZ,
-                )
-                EmuMagnet.SetPillarDimensions(
-                    ship_geo.EmuMagnet.PillarX,
-                    ship_geo.EmuMagnet.PillarY,
-                    ship_geo.EmuMagnet.PillarZ,
-                )
-                detectorList.append(EmuMagnet)
-            if ship_geo.nuTauTargetDesign == 2 or ship_geo.nuTauTargetDesign == 4:
-                EmuMagnet = ROOT.EmulsionMagnet()
-
-            NuTauTarget = ROOT.Target(
-                "NuTauTarget", ship_geo.NuTauTarget.Ydist, ROOT.kTRUE
-            )
-            NuTauTarget.MakeNuTargetPassive(ship_geo.NuTauTarget.nuTargetPassive)
-            if hasattr(
-                ship_geo.NuTauTarget, "SingleEmFilm"
-            ):  # for backward compatibility
-                NuTauTarget.MergeTopBot(ship_geo.NuTauTarget.SingleEmFilm)
-            NuTauTarget.SetDetectorDesign(ship_geo.NuTauTarget.Design)
-            if ship_geo.nuTauTargetDesign != 3:
-                NuTauTarget.SetCenterZ(ship_geo.NuTauTarget.zC)
-            if ship_geo.nuTauTargetDesign == 3:
-                NuTauTarget.SetCenterZ(
-                    ship_geo.EmuMagnet.zC
-                )  # now the centers of emumagnet and nutautarget are different (target does not include HPT)
-                NuTauTarget.SetNumberTargets(ship_geo.NuTauTarget.target)
-                NuTauTarget.SetHpTParam(
-                    ship_geo.tauHPT.nHPT, ship_geo.tauHPT.distHPT, ship_geo.tauHPT.DZ
-                )
-            NuTauTarget.SetNumberBricks(
-                ship_geo.NuTauTarget.col,
-                ship_geo.NuTauTarget.row,
-                ship_geo.NuTauTarget.wall,
-            )
-            NuTauTarget.SetDetectorDimension(
-                ship_geo.NuTauTarget.xdim,
-                ship_geo.NuTauTarget.ydim,
-                ship_geo.NuTauTarget.zdim,
-            )
-            if (
-                hasattr(ship_geo.NuTauTarget, "WallXDim")
-                and hasattr(ship_geo.NuTauTarget, "WallYDim")
-                and hasattr(ship_geo.NuTauTarget, "WallZDim")
-            ):
-                NuTauTarget.SetTargetWallDimension(
-                    ship_geo.NuTauTarget.WallXDim,
-                    ship_geo.NuTauTarget.WallYDim,
-                    ship_geo.NuTauTarget.WallZDim,
-                )
-            NuTauTarget.SetEmulsionParam(
-                ship_geo.NuTauTarget.EmTh,
-                ship_geo.NuTauTarget.EmX,
-                ship_geo.NuTauTarget.EmY,
-                ship_geo.NuTauTarget.PBTh,
-                ship_geo.NuTauTarget.EPlW,
-                ship_geo.NuTauTarget.LeadTh,
-                ship_geo.NuTauTarget.AllPW,
-            )
-            ##
-            if not hasattr(
-                ship_geo.NuTauTarget, "n_plates"
-            ):  # for backward compatibility
-                ship_geo.NuTauTarget.n_plates = 56
-            NuTauTarget.SetBrickParam(
-                ship_geo.NuTauTarget.BrX,
-                ship_geo.NuTauTarget.BrY,
-                ship_geo.NuTauTarget.BrZ,
-                ship_geo.NuTauTarget.BrPackX,
-                ship_geo.NuTauTarget.BrPackY,
-                ship_geo.NuTauTarget.BrPackZ,
-                ship_geo.NuTauTarget.n_plates,
+        else:
+            # This parameters are taken from the top geometry_config
+            # snd_zTot = 3 * u.m #space allocated to Muon spectrometer
+            # snd_zMudetC=ship_geo.Chamber1.z -ship_geo.chambers.Tub1length - snd_zTot/2 -31*u.cm
+            configure_snd_old(
+            os.path.join(fairship, "geometry", "snd_config_old.yaml"),
+            ship_geo.tauMudet.Ztot,
+            ship_geo.tauMudet.zMudetC,
+            ship_geo.cave.floorHeightMuonShield,
             )
 
-            NuTauTarget.SetCESParam(
-                ship_geo.NuTauTarget.RohG,
-                ship_geo.NuTauTarget.LayerCESW,
-                ship_geo.NuTauTarget.CESW,
-                ship_geo.NuTauTarget.CESPack,
-            )
-            NuTauTarget.SetCellParam(ship_geo.NuTauTarget.CellW)
-            if ship_geo.nuTauTargetDesign == 0 or ship_geo.nuTauTargetDesign == 1:
-                NuTauTarget.SetMagnetHeight(ship_geo.EmuMagnet.Y)
-                NuTauTarget.SetColumnHeight(ship_geo.EmuMagnet.ColY)
-                NuTauTarget.SetBaseHeight(ship_geo.EmuMagnet.BaseY)
-                NuTauTarget.SetCoilUpHeight(ship_geo.EmuMagnet.Height1)
-                NuTauTarget.SetCoilDownHeight(ship_geo.EmuMagnet.Height2)
-            if ship_geo.nuTauTargetDesign != 2 and ship_geo.nuTauTargetDesign != 4:
-                NuTauTarget.SetMagneticField(ship_geo.EmuMagnet.B)
-            if ship_geo.nuTauTargetDesign == 2 or ship_geo.nuTauTargetDesign == 4:
-                NuTauTarget.SetPillarDimension(
-                    ship_geo.NuTauTarget.PillarX,
-                    ship_geo.NuTauTarget.PillarY,
-                    ship_geo.NuTauTarget.PillarZ,
-                )
-                NuTauTarget.SetBaseDimension(
-                    ship_geo.NuTauTarget.BaseX,
-                    ship_geo.NuTauTarget.BaseY,
-                    ship_geo.NuTauTarget.BaseZ,
-                )
-
-            # Target Tracker
-            NuTauTT = ROOT.TargetTracker(
-                "TargetTrackers",
-                ship_geo.NuTauTT.TTX,
-                ship_geo.NuTauTT.TTY,
-                ship_geo.NuTauTT.TTZ,
-                ROOT.kTRUE,
-            )
-            NuTauTT.SetDesign(ship_geo.NuTauTT.design)
-            if hasattr(
-                ship_geo.NuTauTT, "scifimat_width"
-            ):  # for backward compatibility
-                NuTauTT.SetSciFiParam(
-                    ship_geo.NuTauTT.scifimat_width,
-                    ship_geo.NuTauTT.scifimat_hor,
-                    ship_geo.NuTauTT.scifimat_vert,
-                    ship_geo.NuTauTT.scifimat_z,
-                    ship_geo.NuTauTT.support_z,
-                    ship_geo.NuTauTT.honeycomb_z,
-                )
-                NuTauTT.SetNumberSciFi(
-                    ship_geo.NuTauTT.n_hor_planes, ship_geo.NuTauTT.n_vert_planes
-                )
-            NuTauTT.SetTargetTrackerParam(
-                ship_geo.NuTauTT.TTX, ship_geo.NuTauTT.TTY, ship_geo.NuTauTT.TTZ
-            )
-            NuTauTT.SetBrickParam(ship_geo.NuTauTarget.CellW)
-            NuTauTT.SetTotZDimension(ship_geo.NuTauTarget.zdim)
-            NuTauTT.SetNumberTT(ship_geo.NuTauTT.n)
-            # method of nutau target that must be called after TT parameter definition
-            NuTauTarget.SetTTzdimension(ship_geo.NuTauTT.TTZ)
-            detectorList.append(NuTauTarget)
-            detectorList.append(NuTauTT)
-
-            # High Precision Tracker
-            if ship_geo.nuTauTargetDesign < 4:
-                tauHpt = ROOT.Hpt(
-                    "HighPrecisionTrackers",
-                    ship_geo.tauHPT.DX,
-                    ship_geo.tauHPT.DY,
-                    ship_geo.tauHPT.DZ,
-                    ROOT.kTRUE,
-                )
-                tauHpt.SetZsize(ship_geo.tauMudet.Ztot)
-                tauHpt.SetDesign(ship_geo.NuTauTarget.Design)
-                if hasattr(
-                    ship_geo.tauHPT, "scifimat_width"
-                ):  # for backward compatibility
-                    tauHpt.SetSciFiParam(
-                        ship_geo.tauHPT.scifimat_width,
-                        ship_geo.tauHPT.scifimat_hor,
-                        ship_geo.tauHPT.scifimat_vert,
-                        ship_geo.tauHPT.scifimat_z,
-                        ship_geo.tauHPT.support_z,
-                        ship_geo.tauHPT.honeycomb_z,
-                    )
-                    tauHpt.SetNumberSciFi(
-                        ship_geo.tauHPT.n_hor_planes, ship_geo.tauHPT.n_vert_planes
-                    )
-                    tauHpt.SetHPTrackerParam(
-                        ship_geo.tauHPT.TX, ship_geo.tauHPT.TY, ship_geo.tauHPT.TZ
-                    )
-                if ship_geo.nuTauTargetDesign < 3:
-                    tauHpt.SetConcreteBaseDim(
-                        ship_geo.tauHPT.ConcreteX,
-                        ship_geo.tauHPT.ConcreteY,
-                        ship_geo.tauHPT.ConcreteZ,
-                    )
-                if ship_geo.nuTauTargetDesign == 3:
-                    tauHpt.SetHPTNumber(ship_geo.tauHPT.nHPT)
-                    tauHpt.SetDistanceHPTs(ship_geo.tauHPT.distHPT)
-                    if hasattr(ship_geo.tauHPT, "SRDY"):
-                        tauHpt.SetSurroundingDetHeight(ship_geo.tauHPT.SRDY)
-                    tauHpt.GetMagnetGeometry(
-                        ship_geo.EmuMagnet.zC, ship_geo.EmuMagnet.Y
-                    )
-                    tauHpt.GetNumberofTargets(ship_geo.NuTauTarget.target)
-                detectorList.append(tauHpt)
 
     # for backward compatibility
     if not hasattr(ship_geo.strawtubes, "YPlaneOffset"):
@@ -701,11 +467,10 @@ def configure(run, ship_geo):
             ship_geo.strawtubes.DeltazFrame = 10.0 * u.cm
             ship_geo.strawtubes.FrameLateralWidth = 1.0 * u.cm
             ship_geo.strawtubes.FrameMaterial = "aluminium"
-        ship_geo.strawtubes.medium = "vacuums" if ship_geo.DecayVolumeMedium == "vaccums" else "air"
+        ship_geo.strawtubes.medium = "vacuums" if ship_geo.DecayVolumeMedium == "vacuums" else "air"
 
         Strawtubes = ROOT.strawtubes(ship_geo.strawtubes.medium)
         Strawtubes.SetZpositions(
-            ship_geo.vetoStation.z,
             ship_geo.TrackStation1.z,
             ship_geo.TrackStation2.z,
             ship_geo.TrackStation3.z,
@@ -731,18 +496,9 @@ def configure(run, ship_geo):
         Strawtubes.SetVacBox_y(ship_geo.strawtubes.VacBox_y)
         Strawtubes.SetStrawLength(ship_geo.strawtubes.StrawLength)
 
-        if hasattr(ship_geo.strawtubes, "StrawLengthVeto"):
-            Strawtubes.SetStrawLengthVeto(ship_geo.strawtubes.StrawLengthVeto)
-            Strawtubes.SetStrawLength12(ship_geo.strawtubes.StrawLength12)
-            Strawtubes.SetVetoYDim(ship_geo.strawtubes.vetoydim)
-            Strawtubes.SetTr12YDim(ship_geo.strawtubes.tr12ydim)
-            Strawtubes.SetTr34YDim(ship_geo.strawtubes.tr34ydim)
-        else:
-            Strawtubes.SetStrawLengthVeto(ship_geo.strawtubes.StrawLength)
-            Strawtubes.SetStrawLength12(ship_geo.strawtubes.StrawLength)
-            Strawtubes.SetVetoYDim(ship_geo.Yheight / 2.0)
-            Strawtubes.SetTr12YDim(ship_geo.Yheight / 2.0)
-            Strawtubes.SetTr34YDim(ship_geo.Yheight / 2.0)
+        Strawtubes.SetStrawLength12(ship_geo.strawtubes.StrawLength12)
+        Strawtubes.SetTr12YDim(ship_geo.strawtubes.tr12ydim)
+        Strawtubes.SetTr34YDim(ship_geo.strawtubes.tr34ydim)
         # for the digitizing step
         Strawtubes.SetStrawResolution(
             getParameter("strawtubes.v_drift", ship_geo, latestShipGeo),
@@ -820,41 +576,6 @@ def configure(run, ship_geo):
 
     upstreamTagger = ROOT.UpstreamTagger("UpstreamTagger", ROOT.kTRUE)
     upstreamTagger.SetZposition(ship_geo.UpstreamTagger.Z_Position)
-    upstreamTagger.SetSizeX_Glass(ship_geo.UpstreamTagger.X_Glass)
-    upstreamTagger.SetSizeY_Glass(ship_geo.UpstreamTagger.Y_Glass)
-    upstreamTagger.SetSizeZ_Glass(ship_geo.UpstreamTagger.Z_Glass)
-    upstreamTagger.SetSizeX_Glass_Border(ship_geo.UpstreamTagger.X_Glass_Border)
-    upstreamTagger.SetSizeY_Glass_Border(ship_geo.UpstreamTagger.Y_Glass_Border)
-    upstreamTagger.SetSizeZ_Glass_Border(ship_geo.UpstreamTagger.Z_Glass_Border)
-    upstreamTagger.SetSizeX_PMMA(ship_geo.UpstreamTagger.X_PMMA)
-    upstreamTagger.SetSizeY_PMMA(ship_geo.UpstreamTagger.Y_PMMA)
-    upstreamTagger.SetSizeZ_PMMA(ship_geo.UpstreamTagger.Z_PMMA)
-    upstreamTagger.SetSizeDX_PMMA(ship_geo.UpstreamTagger.DX_PMMA)
-    upstreamTagger.SetSizeDY_PMMA(ship_geo.UpstreamTagger.DY_PMMA)
-    upstreamTagger.SetSizeDZ_PMMA(ship_geo.UpstreamTagger.DZ_PMMA)
-    upstreamTagger.SetSizeX_FreonSF6(ship_geo.UpstreamTagger.X_FreonSF6)
-    upstreamTagger.SetSizeY_FreonSF6(ship_geo.UpstreamTagger.Y_FreonSF6)
-    upstreamTagger.SetSizeZ_FreonSF6(ship_geo.UpstreamTagger.Z_FreonSF6)
-    upstreamTagger.SetSizeX_FreonSF6_2(ship_geo.UpstreamTagger.X_FreonSF6_2)
-    upstreamTagger.SetSizeY_FreonSF6_2(ship_geo.UpstreamTagger.Y_FreonSF6_2)
-    upstreamTagger.SetSizeZ_FreonSF6_2(ship_geo.UpstreamTagger.Z_FreonSF6_2)
-    upstreamTagger.SetSizeX_FR4(ship_geo.UpstreamTagger.X_FR4)
-    upstreamTagger.SetSizeY_FR4(ship_geo.UpstreamTagger.Y_FR4)
-    upstreamTagger.SetSizeZ_FR4(ship_geo.UpstreamTagger.Z_FR4)
-    upstreamTagger.SetSizeX_Al(ship_geo.UpstreamTagger.X_Aluminium)
-    upstreamTagger.SetSizeY_Al(ship_geo.UpstreamTagger.Y_Aluminium)
-    upstreamTagger.SetSizeZ_Al(ship_geo.UpstreamTagger.Z_Aluminium)
-    upstreamTagger.SetSizeDX_Al(ship_geo.UpstreamTagger.DX_Aluminium)
-    upstreamTagger.SetSizeDY_Al(ship_geo.UpstreamTagger.DY_Aluminium)
-    upstreamTagger.SetSizeDZ_Al(ship_geo.UpstreamTagger.DZ_Aluminium)
-    upstreamTagger.SetSizeX_Air(ship_geo.UpstreamTagger.X_Air)
-    upstreamTagger.SetSizeY_Air(ship_geo.UpstreamTagger.Y_Air)
-    upstreamTagger.SetSizeZ_Air(ship_geo.UpstreamTagger.Z_Air)
-    upstreamTagger.SetSizeX_Strip(ship_geo.UpstreamTagger.X_Strip)
-    upstreamTagger.SetSizeY_Strip(ship_geo.UpstreamTagger.Y_Strip)
-    upstreamTagger.SetSizeX_Strip64(ship_geo.UpstreamTagger.X_Strip64)
-    upstreamTagger.SetSizeY_Strip64(ship_geo.UpstreamTagger.Y_Strip64)
-    upstreamTagger.SetSizeZ_Strip(ship_geo.UpstreamTagger.Z_Strip)
     detectorList.append(upstreamTagger)
 
     timeDet = ROOT.TimeDet("TimeDet", ROOT.kTRUE)
@@ -884,7 +605,7 @@ def configure(run, ship_geo):
                 ship_geo.Yheight / 2.0 * u.m,
             )
         run.SetField(fMagField)
-    #
+
     exclusionList = []
     # exclusionList = ["Muon","Ecal","Hcal","Strawtubes","TargetTrackers","NuTauTarget","HighPrecisionTrackers",\
     #                 "Veto","Magnet","MuonShield","TargetStation","NuTauMudet","EmuMagnet", "TimeDet", "UpstreamTagger"]

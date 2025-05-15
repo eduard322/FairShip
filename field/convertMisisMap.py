@@ -45,7 +45,7 @@ def run(inFileName  = 'BFieldTest.txt',
 
 def createRootMap(inFileName, rootFileName):
 
-    print('Create ROOT map {0} from {1}'.format(rootFileName, inFileName))
+    print(f'Create ROOT map {rootFileName} from {inFileName}')
 
     # Define ROOT file and its TTree
     theFile = ROOT.TFile.Open(rootFileName, 'recreate')
@@ -55,15 +55,15 @@ def createRootMap(inFileName, rootFileName):
 
     # Co-ordinate ranges
     rStruct = ROOT.rangeStruct()
-    rangeTree.Branch('xMin', ROOT.AddressOf(rStruct, 'xMin'), 'xMin/F')
-    rangeTree.Branch('xMax', ROOT.AddressOf(rStruct, 'xMax'), 'xMax/F')
-    rangeTree.Branch('dx', ROOT.AddressOf(rStruct, 'dx'), 'dx/F')
-    rangeTree.Branch('yMin', ROOT.AddressOf(rStruct, 'yMin'), 'yMin/F')
-    rangeTree.Branch('yMax', ROOT.AddressOf(rStruct, 'yMax'), 'yMax/F')
-    rangeTree.Branch('dy', ROOT.AddressOf(rStruct, 'dy'), 'dy/F')
-    rangeTree.Branch('zMin', ROOT.AddressOf(rStruct, 'zMin'), 'zMin/F')
-    rangeTree.Branch('zMax', ROOT.AddressOf(rStruct, 'zMax'), 'zMax/F')
-    rangeTree.Branch('dz', ROOT.AddressOf(rStruct, 'dz'), 'dz/F')
+    rangeTree.Branch('xMin', ROOT.addressof(rStruct, 'xMin'), 'xMin/F')
+    rangeTree.Branch('xMax', ROOT.addressof(rStruct, 'xMax'), 'xMax/F')
+    rangeTree.Branch('dx', ROOT.addressof(rStruct, 'dx'), 'dx/F')
+    rangeTree.Branch('yMin', ROOT.addressof(rStruct, 'yMin'), 'yMin/F')
+    rangeTree.Branch('yMax', ROOT.addressof(rStruct, 'yMax'), 'yMax/F')
+    rangeTree.Branch('dy', ROOT.addressof(rStruct, 'dy'), 'dy/F')
+    rangeTree.Branch('zMin', ROOT.addressof(rStruct, 'zMin'), 'zMin/F')
+    rangeTree.Branch('zMax', ROOT.addressof(rStruct, 'zMax'), 'zMax/F')
+    rangeTree.Branch('dz', ROOT.addressof(rStruct, 'dz'), 'dz/F')
 
     dataTree = ROOT.TTree('Data', 'Data')
     dataTree.SetDirectory(theFile)
@@ -73,9 +73,9 @@ def createRootMap(inFileName, rootFileName):
     # the field bin = (iX*Ny + iY)*Nz + iZ, where Ny and Nz are the number
     # of y and z bins
     dStruct = ROOT.dataStruct()
-    dataTree.Branch('Bx', ROOT.AddressOf(dStruct, 'Bx'), 'Bx/F')
-    dataTree.Branch('By', ROOT.AddressOf(dStruct, 'By'), 'By/F')
-    dataTree.Branch('Bz', ROOT.AddressOf(dStruct, 'Bz'), 'Bz/F')
+    dataTree.Branch('Bx', ROOT.addressof(dStruct, 'Bx'), 'Bx/F')
+    dataTree.Branch('By', ROOT.addressof(dStruct, 'By'), 'By/F')
+    dataTree.Branch('Bz', ROOT.addressof(dStruct, 'Bz'), 'Bz/F')
 
     # mm to cm conversion
     mm2cm = 0.1
@@ -96,7 +96,7 @@ def createRootMap(inFileName, rootFileName):
     y0 = 0.0
     z0 = 0.0
 
-    with open(inFileName, 'r') as f:
+    with open(inFileName) as f:
 
         for line in f:
             iLine += 1
@@ -113,7 +113,7 @@ def createRootMap(inFileName, rootFileName):
                 # Grid Output Min: xMin yMin zMin Max: xMax yMax zMax Grid Size: dx dy dz
                 # These co-ordinate limits are in mm, but the actual data lines use m
 
-                print('sLine = {0}'.format(sLine))
+                print(f'sLine = {sLine}')
                 # For each value, convert from mm to cm
                 rStruct.xMin = float(sLine[3])*mm2cm
                 rStruct.xMax = float(sLine[7])*mm2cm
@@ -130,14 +130,14 @@ def createRootMap(inFileName, rootFileName):
                 Nz = int(((rStruct.zMax - rStruct.zMin)/rStruct.dz) + 1.0)
                 Nzy = Nz*Ny
 
-                print('Nx = {0}, Ny = {1}, Nz = {2}'.format(Nx, Ny, Nz))
+                print(f'Nx = {Nx}, Ny = {Ny}, Nz = {Nz}')
 
                 # Centre the field map on the local origin (cm)
                 x0 = 0.5*(rStruct.xMin + rStruct.xMax)
                 y0 = 0.5*(rStruct.yMin + rStruct.yMax)
                 z0 = 0.5*(rStruct.zMin + rStruct.zMax)
 
-                print('Centering field map using co-ordinate shift {0} {1} {2} cm'.format(x0, y0, z0))
+                print(f'Centering field map using co-ordinate shift {x0} {y0} {z0} cm')
 
                 # Center co-ordinate range limits (cm)
                 rStruct.xMin = rStruct.xMin - x0

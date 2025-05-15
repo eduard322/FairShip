@@ -98,10 +98,8 @@ parser.add_argument("-X", "--moreInfo", help="Print weight and capacity", action
 
 options = parser.parse_args()
 fname = options.geometry
-if fname.startswith('/eos/'):
-    fname = os.environ['EOSSHIP'] + fname
 fgeom = ROOT.TFile.Open(fname)
-fGeo = fgeom.FAIRGeom
+fGeo = fgeom.Get("FAIRGeom")
 top = fGeo.GetTopVolume()
 
 

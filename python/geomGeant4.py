@@ -148,16 +148,17 @@ def addVMCFields(shipGeo, controlFile = '', verbose = False, withVirtualMC = Tru
     # Set the main spectrometer field map as a global field
     if hasattr(shipGeo, 'Bfield'):
       fieldsList = []
-      fieldMaker.defineFieldMap('MainSpecMap', 'files/MainSpectrometerField.root',
+      fieldMaker.defineFieldMap('MainSpecMap', shipGeo.Bfield.fieldMap,
                                 ROOT.TVector3(0.0, 0.0, shipGeo.Bfield.z))
       fieldsList.append('MainSpecMap')
 
-      if shipGeo.EmuMagnet.MagneticField:
-       withConstFieldNuTauDet = False
-       if hasattr(shipGeo.EmuMagnet,'WithConstField'): withConstFieldNuTauDet = shipGeo.EmuMagnet.WithConstField
-       if not withConstFieldNuTauDet:
-        fieldMaker.defineFieldMap('NuMap','files/nuTauDetField.root', ROOT.TVector3(0.0,0.0,shipGeo.EmuMagnet.zC))
-        fieldsList.append('NuMap')
+      if hasattr(shipGeo, 'EmuMagnet'):
+       if shipGeo.EmuMagnet.MagneticField:
+        withConstFieldNuTauDet = False
+        if hasattr(shipGeo.EmuMagnet,'WithConstField'): withConstFieldNuTauDet = shipGeo.EmuMagnet.WithConstField
+        if not withConstFieldNuTauDet:
+         fieldMaker.defineFieldMap('NuMap','files/nuTauDetField.root', ROOT.TVector3(0.0,0.0,shipGeo.EmuMagnet.zC))
+         fieldsList.append('NuMap')
 
       if not shipGeo.hadronAbsorber.WithConstField:
        fieldMaker.defineFieldMap('HadronAbsorberMap','files/FieldHadronStopper_raised_20190411.root', ROOT.TVector3(0.0,0.0,shipGeo.hadronAbsorber.z))
@@ -201,9 +202,9 @@ def printVMCFields():
 
         field =  v.GetField()
         if field:
-         print('Vol is {0}, field is {1}'.format(v.GetName(), field))
+         print(f'Vol is {v.GetName()}, field is {field}')
         else:
-         print('Vol is {0}'.format(v.GetName()))
+         print(f'Vol is {v.GetName()}')
 
         if field:
             # Get the field value assuming the global co-ordinate origin.
@@ -211,7 +212,7 @@ def printVMCFields():
             centre = array('d',[0.0, 0.0, 0.0])
             B = array('d',[0.0, 0.0, 0.0])
             field.Field(centre, B)
-            print('Volume {0} has B = ({1}, {2}, {3}) T'.format(v.GetName(), B[0]/u.tesla,
+            print('Volume {} has B = ({}, {}, {}) T'.format(v.GetName(), B[0]/u.tesla,
                                                                 B[1]/u.tesla, B[2]/u.tesla))
 
 def getRunManager():

@@ -14,7 +14,7 @@ def mem_monitor():
     vmsize = int(_vmsize.split()[1])
     #Getting physical memory size
     pmsize = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    print("memory: virtuell = %5.2F MB  physical = %5.2F MB"%(vmsize/1.0E3,pmsize/1.0E3))
+    print("memory: virtual = %5.2F MB  physical = %5.2F MB"%(vmsize/1.0E3,pmsize/1.0E3))
 
 import ROOT,os,sys
 import global_variables
@@ -92,7 +92,7 @@ if withHists:
  ut.bookHist(h,'distu','distance to wire',100,0.,5.)
  ut.bookHist(h,'distv','distance to wire',100,0.,5.)
  ut.bookHist(h,'disty','distance to wire',100,0.,5.)
- ut.bookHist(h,'nmeas','nr measuerements',100,0.,50.)
+ ut.bookHist(h, 'nmeas', 'nr measurments', 100, 0., 50.)
  ut.bookHist(h,'chi2','Chi2/DOF',100,0.,20.)
 
 import shipDet_conf
@@ -104,7 +104,7 @@ rtdb = run.GetRuntimeDb()
 # -----Create geometry----------------------------------------------
 modules = shipDet_conf.configure(run,ShipGeo)
 # run.Init()
-fgeo.FAIRGeom
+fgeo.Get("FAIRGeom")
 import geomGeant4
 
 if hasattr(ShipGeo.Bfield,"fieldMap"):

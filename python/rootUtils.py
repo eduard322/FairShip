@@ -36,7 +36,7 @@ def readHists(h,fname,wanted=[]):
     h[hname].SetDirectory(gROOT)
     if cln == 'TH2D' or cln == 'TH2F':
          for p in [ '_projx','_projy']:
-           if type(hname) == type('s'): projname = hname+p
+           if type(hname) == str: projname = hname+p
            else: projname = str(hname)+p
            if p.find('x')>-1: h[projname] = h[hname].ProjectionX()
            else             : h[projname] = h[hname].ProjectionY()
@@ -142,7 +142,7 @@ def container_sizes(sTree,perEvent=False):
 
 def stripOffBranches(fout):
     f = TFile(fout)
-    sTree = f.cbmsim
+    sTree = f.Get("cbmsim")
     nEvents = sTree.GetEntries()
     strip = False
     oldTargetClass = False
@@ -174,7 +174,7 @@ def stripOffBranches(fout):
     recf.Close()
     # should do some sanity checks before deleting old file
     f = TFile(sFile)
-    sTree = f.cbmsim
+    sTree = f.Get("cbmsim")
     if nEvents == sTree.GetEntries(): print("looks ok, could be deleted",os.path.abspath('.'))
     else:  print("stripping failed, keep old file",os.path.abspath('.'))
     # os.system('mv '+sFile +' '+fout)

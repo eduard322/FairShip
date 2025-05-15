@@ -1,8 +1,6 @@
 import os,ROOT,shipVertex,shipDet_conf
 import global_variables
-if global_variables.realPR == "Prev":
-  import shipPatRec_prev as shipPatRec # The previous version of the pattern recognition
-else: import shipPatRec
+import shipPatRec
 import shipunit as u
 import rootUtils as ut
 from array import array
@@ -15,13 +13,13 @@ class ShipDigiReco:
  " convert FairSHiP MC hits / digitized hits to measurements"
  def __init__(self,fout,fgeo):
   self.fn = ROOT.TFile.Open(fout,'update')
-  self.sTree     = self.fn.cbmsim
+  self.sTree     = self.fn.Get("cbmsim")
   if self.sTree.GetBranch("FitTracks"):
     print("remove RECO branches and rerun reconstruction")
     self.fn.Close()
     # make a new file without reco branches
     f = ROOT.TFile(fout)
-    sTree = f.cbmsim
+    sTree = f.Get("cbmsim")
     if sTree.GetBranch("FitTracks"): sTree.SetBranchStatus("FitTracks",0)
     if sTree.GetBranch("goodTracks"): sTree.SetBranchStatus("goodTracks",0)
     if sTree.GetBranch("VetoHitOnTrack"): sTree.SetBranchStatus("VetoHitOnTrack",0)
@@ -34,7 +32,7 @@ class ShipDigiReco:
     if sTree.GetBranch("Digi_SBTHits"): sTree.SetBranchStatus("Digi_SBTHits",0)
     if sTree.GetBranch("digiSBT2MC"):   sTree.SetBranchStatus("digiSBT2MC",0)
     if sTree.GetBranch("Digi_TimeDetHits"): sTree.SetBranchStatus("Digi_TimeDetHits",0)
-    if sTree.GetBranch("Digi_UpstreamTaggerHits"): sTree.SetBranchStatus("Digi_UpstreamTaggerHits",0)
+    #if sTree.GetBranch("Digi_UpstreamTaggerHits"): sTree.SetBranchStatus("Digi_UpstreamTaggerHits",0)
     if sTree.GetBranch("Digi_MuonHits"): sTree.SetBranchStatus("Digi_MuonHits",0)
 
     rawFile = fout.replace("_rec.root","_raw.root")
@@ -49,18 +47,7 @@ class ShipDigiReco:
     recf.Close()
     os.system('cp '+rawFile +' '+fout)
     self.fn = ROOT.TFile(fout,'update')
-    self.sTree     = self.fn.cbmsim
-#  check that all containers are present, otherwise create dummy version
-  self.dummyContainers={}
-  branch_class = {"vetoPoint":"vetoPoint","ShipRpcPoint":"ShipRpcPoint","TargetPoint":"TargetPoint",\
-                  "strawtubesPoint":"strawtubesPoint","EcalPointLite":"ecalPoint",\
-                  "TimeDetPoint":"TimeDetPoint","muonPoint":"muonPoint","UpstreamTaggerPoint":"UpstreamTaggerPoint"}
-  for x in branch_class:
-    if not self.sTree.GetBranch(x):
-     self.dummyContainers[x+"_array"] = ROOT.TClonesArray(branch_class[x])
-     self.dummyContainers[x] = self.sTree.Branch(x,self.dummyContainers[x+"_array"],32000,-1)
-     setattr(self.sTree,x,self.dummyContainers[x+"_array"])
-     self.dummyContainers[x].Fill()
+    self.sTree = self.fn.Get("cbmsim")
 #
   if self.sTree.GetBranch("GeoTracks"): self.sTree.SetBranchStatus("GeoTracks",0)
 # prepare for output
@@ -78,9 +65,9 @@ class ShipDigiReco:
   self.fTrackletsArray = ROOT.TClonesArray("Tracklet")
   self.Tracklets   = self.sTree.Branch("Tracklets",  self.fTrackletsArray,32000,-1)
 #
-  self.digiStraw    = ROOT.TClonesArray("strawtubesHit")
+  self.digiStraw = ROOT.std.vector("strawtubesHit")()
   self.digiStrawBranch   = self.sTree.Branch("Digi_StrawtubesHits",self.digiStraw,32000,-1)
-  self.digiSBT    = ROOT.TClonesArray("vetoHit")
+  self.digiSBT    = ROOT.std.vector("vetoHit")()
   self.digiSBTBranch=self.sTree.Branch("Digi_SBTHits",self.digiSBT,32000,-1)
   self.vetoHitOnTrackArray    = ROOT.TClonesArray("vetoHitOnTrack")
   self.vetoHitOnTrackBranch=self.sTree.Branch("VetoHitOnTrack",self.vetoHitOnTrackArray,32000,-1)
@@ -88,8 +75,8 @@ class ShipDigiReco:
   self.mcLinkSBT   = self.sTree.Branch("digiSBT2MC",self.digiSBT2MC,32000,-1)
   self.digiTimeDet    = ROOT.TClonesArray("TimeDetHit")
   self.digiTimeDetBranch=self.sTree.Branch("Digi_TimeDetHits",self.digiTimeDet,32000,-1)
-  self.digiUpstreamTagger    = ROOT.TClonesArray("UpstreamTaggerHit")
-  self.digiUpstreamTaggerBranch=self.sTree.Branch("Digi_UpstreamTaggerHits",self.digiUpstreamTagger,32000,-1)
+  #self.digiUpstreamTagger    = ROOT.TClonesArray("UpstreamTaggerHit")
+  #self.digiUpstreamTaggerBranch=self.sTree.Branch("Digi_UpstreamTaggerHits",self.digiUpstreamTagger,32000,-1)
   self.digiMuon    = ROOT.TClonesArray("muonHit")
   self.digiMuonBranch=self.sTree.Branch("Digi_muonHits",self.digiMuon,32000,-1)
 # for the digitizing step
@@ -228,13 +215,13 @@ class ShipDigiReco:
    self.header.SetRunId( self.sTree.MCEventHeader.GetRunID() )
    self.header.SetMCEntryNumber( self.sTree.MCEventHeader.GetEventID() )  # counts from 1
    self.eventHeader.Fill()
-   self.digiSBT.Delete()
+   self.digiSBT.clear()
    self.digiSBT2MC.clear()
-   self.digitizeSBT()
+   self.digitize_SBT()
    self.digiSBTBranch.Fill()
    self.mcLinkSBT.Fill()
-   self.digiStraw.Delete()
-   self.digitizeStrawTubes()
+   self.digiStraw.clear()
+   self.digitize_straw_tubes()
    self.digiStrawBranch.Fill()
    self.digiTimeDet.Delete()
    self.digitizeTimeDet()
@@ -707,7 +694,13 @@ class ShipDigiReco:
         hitsPerDetId[detID] = index
      index+=1
 
- def digitizeSBT(self):
+ def digitize_SBT(self):
+     """Digitize Surrounding Background Tagger MC hits.
+
+     TDC defined as the time of the first MC hit in the cell.
+     Eloss defined as the cumulative energy deposition of MC hits in the cell.
+
+     """
      ElossPerDetId    = {}
      tOfFlight        = {}
      listOfVetoPoints = {}
@@ -723,35 +716,37 @@ class ShipDigiReco:
        ElossPerDetId[detID] += Eloss
        listOfVetoPoints[detID].append(key)
        tOfFlight[detID].append(aMCPoint.GetTime())
-     index=0
      for seg in ElossPerDetId:
        aHit = ROOT.vetoHit(seg,ElossPerDetId[seg])
        aHit.SetTDC(min( tOfFlight[seg] ) + self.sTree.t0 )
-       if self.digiSBT.GetSize() == index:
-          self.digiSBT.Expand(index+1000)
        if ElossPerDetId[seg]<0.045:    aHit.setInvalid()  # threshold for liquid scintillator, source Berlin group
-       self.digiSBT[index] = aHit
+       self.digiSBT.push_back(aHit)
        v = ROOT.std.vector('int')()
        for x in listOfVetoPoints[seg]:
            v.push_back(x)
        self.digiSBT2MC.push_back(v)
-       index=index+1
- def digitizeStrawTubes(self):
- # digitize FairSHiP MC hits
-   index = 0
-   hitsPerDetId = {}
-   for aMCPoint in self.sTree.strawtubesPoint:
-     aHit = ROOT.strawtubesHit(aMCPoint,self.sTree.t0)
-     if self.digiStraw.GetSize() == index: self.digiStraw.Expand(index+1000)
-     self.digiStraw[index]=aHit
-     if aHit.isValid():
-      detID = aHit.GetDetectorID()
-      if detID in hitsPerDetId:
-       if self.digiStraw[hitsPerDetId[detID]].GetTDC() > aHit.GetTDC():
- # second hit with smaller tdc
-        self.digiStraw[hitsPerDetId[detID]].setInvalid()
-        hitsPerDetId[detID] = index
-     index+=1
+
+ def digitize_straw_tubes(self):
+    """Digitize strawtube MC hits.
+
+    The earliest hit per straw will be marked valid, all later ones invalid.
+    """
+    earliest_per_det_id = {}
+    for index, point in enumerate(self.sTree.strawtubesPoint):
+        hit = ROOT.strawtubesHit(point , self.sTree.t0)
+        self.digiStraw.push_back(hit)
+        if hit.isValid():
+            detector_id = hit.GetDetectorID()
+            if detector_id in earliest_per_det_id:
+               earliest = earliest_per_det_id[detector_id]
+               if self.digiStraw[earliest].GetTDC() > hit.GetTDC():
+                   # second hit with smaller tdc
+                   self.digiStraw[earliest].setInvalid()
+                   earliest_per_det_id[detector_id] = index
+               else:
+                   self.digiStraw[index].setInvalid()
+            else:
+                earliest_per_det_id[detector_id] = index
 
  def withT0Estimate(self):
  # loop over all straw tdcs and make average, correct for ToF
@@ -766,9 +761,6 @@ class ShipDigiReco:
     key+=1
     if not aDigi.isValid(): continue
     detID = aDigi.GetDetectorID()
-# don't use hits from straw veto
-    station = int(detID//10000000)
-    if station > 4 : continue
     global_variables.modules["Strawtubes"].StrawEndPoints(detID, start, stop)
     delt1 = (start[2]-z1)/u.speedOfLight
     t0+=aDigi.GetDigi()-delt1
@@ -791,9 +783,6 @@ class ShipDigiReco:
      key+=1
      if not aDigi.isValid(): continue
      detID = aDigi.GetDetectorID()
-# don't use hits from straw veto
-     station = int(detID//10000000)
-     if station > 4 : continue
      global_variables.modules["Strawtubes"].StrawEndPoints(detID, start, stop)
    #distance to wire
      delt1 = (start[2]-z1)/u.speedOfLight
@@ -889,9 +878,9 @@ class ShipDigiReco:
 #
   for atrack in hitPosLists:
     if atrack < 0: continue # these are hits not assigned to MC track because low E cut
-    pdg    = self.sTree.MCTrack[atrack].GetPdgCode()
-    if not self.PDG.GetParticle(pdg): continue # unknown particle
-    # pdg = 13
+    # pdg    = self.sTree.MCTrack[atrack].GetPdgCode()
+    # if not self.PDG.GetParticle(pdg): continue # unknown particle
+    pdg = 13 # assume all tracks are muons
     meas = hitPosLists[atrack]
     detIDs = hit_detector_ids[atrack]
     nM = meas.size()
@@ -983,6 +972,7 @@ class ShipDigiReco:
       error = "Fit not converged"
       ut.reportError(error)
     nmeas = fitStatus.getNdf()
+    global_variables.h['nmeas'].Fill(nmeas)
     if nmeas > 0:
       chi2 = fitStatus.getChi2() / nmeas
       global_variables.h['chi2'].Fill(chi2)

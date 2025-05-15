@@ -63,7 +63,7 @@ EmulsionMagnet::EmulsionMagnet(const char* name, const Double_t zC,const char* T
 void EmulsionMagnet::SetDesign(Int_t Design)
 {
   fDesign = Design;
-  Info("Chosen TP Design (0 no, 1 yes) "," %i", fDesign);
+  LOG(info) << "SND design" << fDesign;
 }
 
 void EmulsionMagnet::SetGaps(Double_t Up, Double_t Down)
@@ -519,7 +519,7 @@ void EmulsionMagnet::ConstructGeometry()
       //circular arcs (first two options are radii, not half radii!)
       Double_t OuterRadius = fCoilY + fCoilThickness;
 
-      [[maybe_unused]] auto *Coillateraltuberightdown = new TGeoTubeSeg("Coillateraltuberightdown",fCoilThickness,OuterRadius, fCoilX/2,90,180);      
+      [[maybe_unused]] auto *Coillateraltuberightdown = new TGeoTubeSeg("Coillateraltuberightdown",fCoilThickness,OuterRadius, fCoilX/2,90,180);
       [[maybe_unused]] auto *Coillateraltuberighttup = new TGeoTubeSeg("Coillateraltuberightup",fCoilThickness,OuterRadius, fCoilX/2,0,90);
       [[maybe_unused]] auto *Coillateraltubeleftup = new TGeoTubeSeg("Coillateraltubeleftup",fCoilThickness,OuterRadius, fCoilX/2,270,360);
       [[maybe_unused]] auto *Coillateraltubeleftdown = new TGeoTubeSeg("Coillateraltubeleftdown",fCoilThickness,OuterRadius, fCoilX/2,180,270);

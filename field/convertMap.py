@@ -51,10 +51,10 @@ def run(inFileName = 'FieldTest.txt', rootFileName = 'BFieldTest.root',
 
 def createRootMap(inFileName, rootFileName, cmScale, storeCoords):
 
-    print('Create map {0} from {1} using cmScale = {2}'.format(rootFileName,
+    print('Create map {} from {} using cmScale = {}'.format(rootFileName,
                                                                  inFileName, cmScale))
     if storeCoords is True:
-        print('We will also store the x,y,z field coordinates in {0}'.format(rootFileName))
+        print(f'We will also store the x,y,z field coordinates in {rootFileName}')
 
     rangeInfo = findRanges(inFileName, cmScale)
 
@@ -66,15 +66,15 @@ def createRootMap(inFileName, rootFileName, cmScale, storeCoords):
 
     # Co-ordinate ranges
     rStruct = ROOT.rangeStruct()
-    rangeTree.Branch('xMin', ROOT.AddressOf(rStruct, 'xMin'), 'xMin/F')
-    rangeTree.Branch('xMax', ROOT.AddressOf(rStruct, 'xMax'), 'xMax/F')
-    rangeTree.Branch('dx', ROOT.AddressOf(rStruct, 'dx'), 'dx/F')
-    rangeTree.Branch('yMin', ROOT.AddressOf(rStruct, 'yMin'), 'yMin/F')
-    rangeTree.Branch('yMax', ROOT.AddressOf(rStruct, 'yMax'), 'yMax/F')
-    rangeTree.Branch('dy', ROOT.AddressOf(rStruct, 'dy'), 'dy/F')
-    rangeTree.Branch('zMin', ROOT.AddressOf(rStruct, 'zMin'), 'zMin/F')
-    rangeTree.Branch('zMax', ROOT.AddressOf(rStruct, 'zMax'), 'zMax/F')
-    rangeTree.Branch('dz', ROOT.AddressOf(rStruct, 'dz'), 'dz/F')
+    rangeTree.Branch('xMin', ROOT.addressof(rStruct, 'xMin'), 'xMin/F')
+    rangeTree.Branch('xMax', ROOT.addressof(rStruct, 'xMax'), 'xMax/F')
+    rangeTree.Branch('dx', ROOT.addressof(rStruct, 'dx'), 'dx/F')
+    rangeTree.Branch('yMin', ROOT.addressof(rStruct, 'yMin'), 'yMin/F')
+    rangeTree.Branch('yMax', ROOT.addressof(rStruct, 'yMax'), 'yMax/F')
+    rangeTree.Branch('dy', ROOT.addressof(rStruct, 'dy'), 'dy/F')
+    rangeTree.Branch('zMin', ROOT.addressof(rStruct, 'zMin'), 'zMin/F')
+    rangeTree.Branch('zMax', ROOT.addressof(rStruct, 'zMax'), 'zMax/F')
+    rangeTree.Branch('dz', ROOT.addressof(rStruct, 'dz'), 'dz/F')
 
     rStruct.xMin = rangeInfo['xMin']
     rStruct.xMax = rangeInfo['xMax']
@@ -96,7 +96,7 @@ def createRootMap(inFileName, rootFileName, cmScale, storeCoords):
     #y0 = 0.0
     #z0 = 0.0
 
-    print('Centering field map using co-ordinate shift {0} {1} {2} cm'.format(x0, y0, z0))
+    print(f'Centering field map using co-ordinate shift {x0} {y0} {z0} cm')
 
     # Center co-ordinate range limits (cm)
     rStruct.xMin = rStruct.xMin - x0
@@ -108,9 +108,9 @@ def createRootMap(inFileName, rootFileName, cmScale, storeCoords):
     rStruct.zMin = rStruct.zMin - z0
     rStruct.zMax = rStruct.zMax - z0
 
-    print('x range = {0} to {1}'.format(rStruct.xMin, rStruct.xMax))
-    print('y range = {0} to {1}'.format(rStruct.yMin, rStruct.yMax))
-    print('z range = {0} to {1}'.format(rStruct.zMin, rStruct.zMax))
+    print(f'x range = {rStruct.xMin} to {rStruct.xMax}')
+    print(f'y range = {rStruct.yMin} to {rStruct.yMax}')
+    print(f'z range = {rStruct.zMin} to {rStruct.zMax}')
 
     # Fill info into range tree
     rangeTree.Fill()
@@ -125,16 +125,16 @@ def createRootMap(inFileName, rootFileName, cmScale, storeCoords):
     # of y and z bins
     dStruct = ROOT.dataStruct()
     if storeCoords is True:
-        dataTree.Branch('x', ROOT.AddressOf(dStruct, 'x'), 'x/F')
-        dataTree.Branch('y', ROOT.AddressOf(dStruct, 'y'), 'y/F')
-        dataTree.Branch('z', ROOT.AddressOf(dStruct, 'z'), 'z/F')
+        dataTree.Branch('x', ROOT.addressof(dStruct, 'x'), 'x/F')
+        dataTree.Branch('y', ROOT.addressof(dStruct, 'y'), 'y/F')
+        dataTree.Branch('z', ROOT.addressof(dStruct, 'z'), 'z/F')
 
-    dataTree.Branch('Bx', ROOT.AddressOf(dStruct, 'Bx'), 'Bx/F')
-    dataTree.Branch('By', ROOT.AddressOf(dStruct, 'By'), 'By/F')
-    dataTree.Branch('Bz', ROOT.AddressOf(dStruct, 'Bz'), 'Bz/F')
+    dataTree.Branch('Bx', ROOT.addressof(dStruct, 'Bx'), 'Bx/F')
+    dataTree.Branch('By', ROOT.addressof(dStruct, 'By'), 'By/F')
+    dataTree.Branch('Bz', ROOT.addressof(dStruct, 'Bz'), 'Bz/F')
 
     # Reopen the file and store the information in the ROOT file
-    with open(inFileName, 'r') as f:
+    with open(inFileName) as f:
 
         # Read each line
         for line in f:
@@ -174,7 +174,7 @@ def findRanges(inFileName, cmScale):
     yArray = []
     zArray = []
 
-    with open(inFileName, 'r') as f:
+    with open(inFileName) as f:
 
         # Read each line
         for line in f:
