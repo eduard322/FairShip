@@ -344,7 +344,7 @@ if simEngine == "PG":
   myPgun = ROOT.FairBoxGenerator(options.pID,1)
   myPgun.SetPRange(options.Estart,options.Eend)
   myPgun.SetPhiRange(0, 360) # // Azimuth angle range [degree]
-  myPgun.SetXYZ(0.*u.cm, 0.*u.cm, 0.*u.cm)
+  myPgun.SetXYZ(0.*u.cm, 0.*u.cm, -3520.*u.cm)
   myPgun.SetThetaRange(0,0) # // Polar angle in lab system range [degree]
   primGen.AddGenerator(myPgun)
 # -----muon DIS Background------------------------
