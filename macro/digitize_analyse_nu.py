@@ -37,9 +37,9 @@ class FairShipAnalyzer:
     def analyze_events(self):
         zero_events = 0
         for i, event in enumerate(self.chain):
-            if len(event.MTCdetPoint) == 0:
+            if len(event.MtcDetPoint) == 0:
                 zero_events += 1
-            print(i, len(event.MTCdetPoint))
+            print(i, len(event.MtcDetPoint))
         print(f"Number of events with no hits: {zero_events} out of {self.get_entries()}")
 
     def set_fiber_dimensions(self, detector_properties, fiber_dimensions):
@@ -115,11 +115,12 @@ class FairShipAnalyzer:
         coord: Either "z" (to use the Z coordinate) or "layer" (to use the layer number).
         """
         df_event = self.df_digi.query(f"event_id == {event_id}")
+        df_event = df_event.loc[df_event["layer_type"].isin([0, 1])].copy()
         fig, ax = plt.subplots(1, 2, figsize=(10, 5))
         
         if coord == "z":
             x_data = df_event["z"]
-            x_label = "Z [cm]"
+            x_label = "Z"
             # Create 100 bins between the start and end of the detector in Z.
             bins_x = np.linspace(self.detector_properties["startZ"],
                                 self.detector_properties["endZ"], 100)
@@ -141,7 +142,7 @@ class FairShipAnalyzer:
         # Plot Z(or layer)-X projection.
         ax[0].hist2d(x_data, df_event["x"], bins=bins_1, norm=LogNorm(), cmap="viridis")
         ax[0].set_title(f"{x_label}-X projection")
-        ax[0].set_xlabel(x_label)
+        ax[0].set_xlabel(x_label + " [cm]")
         ax[0].set_ylabel("X [cm]")
 
         # Plot Z(or layer)-Y projection.
@@ -152,7 +153,80 @@ class FairShipAnalyzer:
 
         # Debug print to show the range in Z from the complete dataset
         # print(self.df_digi["z"].min(), self.df_digi["z"].max())
-        fig.savefig(f"event_display_{coord}.png")
+        fig.savefig(f"event_display_{coord}.pdf")
+    def event_display_1(self, event_id, coord="3d"):
+        """
+        Display an event by plotting projections or a 3D scatter of the hit positions.
+        The user can choose 2D projections against the Z coordinate (default), layer number, or a full 3D view.
+
+        Parameters:
+        event_id: The identifier for the event.
+        coord: "z" (Z coordinate projections), "layer" (layer number projections), or "3d" (3D scatter).
+        """
+        # Filter hits for the given event and relevant layer types
+        df_event = self.df_digi.query(f"event_id == {event_id}")
+        df_event = df_event.loc[df_event["layer_type"].isin([0, 1])].copy()
+
+        # 3D view
+        if coord == "3d":
+            from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+            fig = plt.figure(figsize=(8, 6))
+            ax = fig.add_subplot(111, projection='3d')
+            # Scatter plot of hits in 3D
+            sc = ax.scatter(df_event['x'], df_event['y'], df_event['z'],
+                            c=df_event['z'], cmap='viridis', s=5, alpha=0.6)
+            ax.set_title(f"3D scatter of Event {event_id}")
+            ax.set_xlabel("X [cm]")
+            ax.set_ylabel("Y [cm]")
+            ax.set_zlabel("Z [cm]")
+            fig.colorbar(sc, ax=ax, label='Z [cm]')
+            fig.savefig(f"event_display_3d_{event_id}.pdf")
+            return
+
+        # 2D histograms for Z or layer projections
+        fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+
+        if coord == "z":
+            x_data = df_event["z"]
+            x_label = "Z"
+            bins_x = np.linspace(self.detector_properties["startZ"],
+                                self.detector_properties["endZ"], 100)
+        elif coord == "layer":
+            x_data = df_event["layer_id"]
+            x_label = "Layer N"
+            bins_x = np.arange(-0.5, 44 + 1.5, 1)
+        else:
+            raise ValueError("coord must be one of 'z', 'layer', or '3d'")
+
+        # Define bins for Y and X projections
+        bins_xy = (
+            bins_x,
+            np.linspace(-self.detector_properties["width"]/2,
+                        self.detector_properties["width"]/2, 100)
+        )
+        bins_xyz = (
+            bins_x,
+            np.linspace(-self.detector_properties["height"]/2,
+                        self.detector_properties["height"]/2, 100)
+        )
+
+        # Plot X projection
+        ax[0].hist2d(x_data, df_event["x"], bins=bins_xy,
+                    norm=LogNorm(), cmap="viridis")
+        ax[0].set_title(f"{x_label}-X projection")
+        ax[0].set_xlabel(f"{x_label} [cm]")
+        ax[0].set_ylabel("X [cm]")
+
+        # Plot Y projection
+        ax[1].hist2d(x_data, df_event["y"], bins=bins_xyz,
+                    norm=LogNorm(), cmap="viridis")
+        ax[1].set_title(f"{x_label}-Y projection")
+        ax[1].set_xlabel(f"{x_label}")
+        ax[1].set_ylabel("Y [cm]")
+
+        # Save the figure
+        fig.savefig(f"event_display_{coord}_{event_id}.pdf")
+
 
     def event_display_digi(self, event_id):
         """
@@ -222,6 +296,39 @@ class FairShipAnalyzer:
         ax[1].set_xlabel("Layer ID")
         ax[1].set_ylabel("Cell ID")
         ax[1].set_title("Scint. " + f"E_nu = {df_event['E_nu'].iloc[0]:.2f} [GeV]")
+
+
+    def event_display_real(self, event_id):
+        fig, ax = plt.subplots(1, 2, figsize=(12, 6), dpi=100)
+
+        def particle_map(pdg):
+            """Map a PDG code to a LaTeX formatted particle name for annotation."""
+            if pdg == 12:
+                return "${\\nu}_{e}$"
+            elif pdg == 14:
+                return "${\\nu}_{\\mu}$"
+            elif pdg == 16:
+                return "${\\nu}_{\\tau}$"
+            elif pdg == -12:
+                return "${\\bar{\\nu}}_{e}$"
+            elif pdg == -14:
+                return "${\\bar{\\nu}}_{\\mu}$"
+            elif pdg == -16:
+                return "${\\bar{\\nu}}_{\\tau}$"
+            else:
+                return f"PDG {pdg}"
+
+        # --- Retrieve the event data ---
+        df_event = self.df_digi[self.df_digi["event_id"] == event_id]
+        print(df_event)
+        # For annotation, get neutrino parameters once.
+        x_nu = df_event["x_nu"].iloc[0]
+        y_nu = df_event["y_nu"].iloc[0]
+        z_nu = df_event["z_nu"].iloc[0]
+        px_nu = df_event["px_nu"].iloc[0]
+        py_nu = df_event["py_nu"].iloc[0]
+        pz_nu = df_event["pz_nu"].iloc[0]
+        particle_name = particle_map(df_event["pdg_nu"].iloc[0])
 
 
 
@@ -298,6 +405,7 @@ class FairShipAnalyzer:
 
         # --- Retrieve the event data ---
         df_event = self.df_digi[self.df_digi["event_id"] == event_id]
+        print(df_event)
         # For annotation, get neutrino parameters once.
         x_nu = df_event["x_nu"].iloc[0]
         y_nu = df_event["y_nu"].iloc[0]
@@ -314,6 +422,7 @@ class FairShipAnalyzer:
         width = self.detector_properties["width"]
         angle = self.detector_properties["angle"]
         fiber_pitch = self.fiber_dimensions["fiber_pitch"]
+        self.number_of_fibers = 1825
 
         # Determine figure layout based on chosen coordinate system(s)
         if plot_coords == "both":
@@ -347,7 +456,7 @@ class FairShipAnalyzer:
         # -------------------------
         if plot_coords in ["digi", "both", "3d"]:
             # --- SciFi (layer_type 1 or 2) digitized ---
-            df_12 = df_event[df_event["layer_type"].isin([1, 2])]
+            df_12 = df_event[df_event["layer_type"].isin([0, 1])]
             bins_x1 = np.arange(-0.5, total_sciFi_layers + 0.5, 1.0)
             bins_y1 = np.arange(0, self.number_of_fibers + 2)
             if plot_type == "hist2d":
@@ -384,7 +493,7 @@ class FairShipAnalyzer:
                             color="red", ha="center", va="bottom", fontsize=12)
 
             # --- Scintillator (layer_type 3) digitized ---
-            df_3 = df_event[df_event["layer_type"] == 3]
+            df_3 = df_event[df_event["layer_type"] == 2]
             bins_x2 = np.arange(-0.5, total_sciFi_layers + 0.5, 1.0)
             bins_y2 = np.arange(0, 2500 + 1)
             if plot_type == "hist2d":
@@ -408,7 +517,7 @@ class FairShipAnalyzer:
         # -------------------------
         if plot_coords in ["zx", "both"]:
             # --- SciFi in real coordinates ---
-            df_12 = df_event[df_event["layer_type"].isin([1, 2])].copy()
+            df_12 = df_event[df_event["layer_type"].isin([0, 1])].copy()
             df_12["x_real"] = df_12["x"]
             df_12["z_real"] = df_12["z"]
             bins_x1 = np.linspace(self.detector_properties["startZ"], self.detector_properties["endZ"], 100)
@@ -445,7 +554,7 @@ class FairShipAnalyzer:
             ax_zx_scint.text(z_nu - 5, x_nu + label_offset, particle_name,
                             color="red", ha="center", va="bottom", fontsize=12)
             # --- Scintillator in real coordinates ---
-            df_3 = df_event[df_event["layer_type"] == 3].copy()
+            df_3 = df_event[df_event["layer_type"] == 2].copy()
             df_3["x_real"] = df_3["x"]
             df_3["z_real"] = df_3["z"]
             if plot_type == "hist2d":
@@ -685,7 +794,7 @@ class FairShipAnalyzer:
             nu_flavor.append(df_event["pdg_nu"].iloc[0])
             
             # --- Build histogram for layer_type == 1 ---
-            df_type1 = df_event[df_event["layer_type"] == 1]
+            df_type1 = df_event[df_event["layer_type"] == 0]
             if not df_type1.empty:
                 if plot_type == "hist2d":
                     H_type1, _, _ = np.histogram2d(
@@ -707,7 +816,7 @@ class FairShipAnalyzer:
             hist_type1.append(H_type1.flatten())
 
             # --- Build histogram for layer_type == 2 ---
-            df_type2 = df_event[df_event["layer_type"] == 2]
+            df_type2 = df_event[df_event["layer_type"] == 1]
             if not df_type2.empty:
                 if plot_type == "hist2d":
                     H_type2, _, _ = np.histogram2d(
@@ -729,7 +838,7 @@ class FairShipAnalyzer:
             hist_type2.append(H_type2.flatten())
 
             # --- Build histogram for layer_type == 3 ---
-            df_type3 = df_event[df_event["layer_type"] == 3]
+            df_type3 = df_event[df_event["layer_type"] == 2]
             if not df_type3.empty:
                 if plot_type == "hist2d":
                     H_type3, _, _ = np.histogram2d(
@@ -827,7 +936,7 @@ class FairShipAnalyzer:
         }
 
 
-    def create_fiber_structure(self):
+    def create_fiber_structure(self, hardcoded = False):
         df_digi = {"event_id": [], "multiplicity": [], "track_id": [], 
                    "E_nu": [], "theta_nu": [], "px_nu": [], "py_nu": [], "pz_nu": [], "x_nu": [], "y_nu": [], "z_nu": [], "pdg_nu": [], 
                    "fiber_id": [], "fiber_id_local": [], "layer_type": [], "layer_id": [], 
@@ -840,51 +949,90 @@ class FairShipAnalyzer:
                 if mctrack.GetMotherId() == 0:
                     event_multiplicity += 1
 
-            if len(event.MTCdetPoint) == 0:
+            if len(event.MtcDetPoint) == 0:
                 continue
-            for hit in event.MTCdetPoint:
-                if hit.GetLayerType() < 3:
-                    fiber_id = self.get_global_fiber_id(hit)
-                    fiber_id_local = self.get_local_fiber_id(hit)
-                    if hit.GetEnergyLoss()*1e6 < self.detector_properties["Eloss_threshold"]:
-                        continue
-                    # fiber_id_local = fiber_id_local + self.number_of_fibers if hit.GetLayerType() == 2 else fiber_id_local
-                else:
-                    fiber_id = hit.GetDetectorID()
-                    fiber_id_local = fiber_id % 10000
+            if not hardcoded:
+                for hit in event.MtcDetPoint:
+                    if hit.GetLayerType() < 3:
+                        fiber_id = self.get_global_fiber_id(hit)
+                        fiber_id_local = self.get_local_fiber_id(hit)
+                        if hit.GetEnergyLoss()*1e6 < self.detector_properties["Eloss_threshold"]:
+                            continue
+                        # fiber_id_local = fiber_id_local + self.number_of_fibers if hit.GetLayerType() == 2 else fiber_id_local
+                    else:
+                        fiber_id = hit.GetDetectorID()
+                        fiber_id_local = fiber_id % 10000
 
 
 
 
-                df_digi["event_id"].append(i)
-                df_digi["multiplicity"].append(event_multiplicity)
-                df_digi["track_id"].append(hit.GetTrackID())
-                df_digi["E_nu"].append(E_nu)
-                df_digi["theta_nu"].append(np.arccos(Pz_nu / E_nu)*180/np.pi)
-                df_digi["px_nu"].append(Px_nu)
-                df_digi["py_nu"].append(Py_nu)
-                df_digi["pz_nu"].append(Pz_nu)
-                df_digi["x_nu"].append(X_nu)
-                df_digi["y_nu"].append(Y_nu)
-                df_digi["z_nu"].append(Z_nu)
-                df_digi["pdg_nu"].append(event.MCTrack[0].GetPdgCode())
-                df_digi["fiber_id"].append(fiber_id)
-                df_digi["layer_type"].append(hit.GetLayerType())
-                df_digi["fiber_id_local"].append(fiber_id_local)
-                # if  hit.GetLayerType() == 3:
-                #     df_digi["layer_id"].append(hit.GetLayer() * 2 + 3)
-                # else:
-                #     df_digi["layer_id"].append(hit.GetLayer() * 2 if hit.GetLayerType() == 1 else hit.GetLayer() * 2 + 1)
-                df_digi["layer_id"].append(hit.GetLayer())
-                df_digi["x"].append(hit.GetX())
-                df_digi["y"].append(hit.GetY())
-                df_digi["z"].append(hit.GetZ())
-                df_digi["pdg"].append(hit.PdgCode())
-                df_digi["Eloss"].append(hit.GetEnergyLoss())
+                    df_digi["event_id"].append(i)
+                    df_digi["multiplicity"].append(event_multiplicity)
+                    df_digi["track_id"].append(hit.GetTrackID())
+                    df_digi["E_nu"].append(E_nu)
+                    df_digi["theta_nu"].append(np.arccos(Pz_nu / E_nu)*180/np.pi)
+                    df_digi["px_nu"].append(Px_nu)
+                    df_digi["py_nu"].append(Py_nu)
+                    df_digi["pz_nu"].append(Pz_nu)
+                    df_digi["x_nu"].append(X_nu)
+                    df_digi["y_nu"].append(Y_nu)
+                    df_digi["z_nu"].append(Z_nu)
+                    df_digi["pdg_nu"].append(event.MCTrack[0].GetPdgCode())
+                    df_digi["fiber_id"].append(fiber_id)
+                    df_digi["layer_type"].append(hit.GetLayerType())
+                    df_digi["fiber_id_local"].append(fiber_id_local)
+                    # if  hit.GetLayerType() == 3:
+                    #     df_digi["layer_id"].append(hit.GetLayer() * 2 + 3)
+                    # else:
+                    #     df_digi["layer_id"].append(hit.GetLayer() * 2 if hit.GetLayerType() == 1 else hit.GetLayer() * 2 + 1)
+                    df_digi["layer_id"].append(hit.GetLayer())
+                    df_digi["x"].append(hit.GetX())
+                    df_digi["y"].append(hit.GetY())
+                    df_digi["z"].append(hit.GetZ())
+                    df_digi["pdg"].append(hit.PdgCode())
+                    df_digi["Eloss"].append(hit.GetEnergyLoss())
+            else:
+               for hit in event.MtcDetPoint:
+                    if int(hit.GetDetectorID() / 1e5) % 10 < 2:
+                        fiber_id = hit.GetDetectorID()
+                        fiber_id_local = hit.GetDetectorID() % 10000
+                        if hit.GetEnergyLoss()*1e6 < self.detector_properties["Eloss_threshold"]:
+                            continue
+                        # fiber_id_local = fiber_id_local + self.number_of_fibers if hit.GetLayerType() == 2 else fiber_id_local
+                    else:
+                        fiber_id = hit.GetDetectorID()
+                        fiber_id_local = fiber_id % 10000
+
+
+                    df_digi["event_id"].append(i)
+                    df_digi["multiplicity"].append(event_multiplicity)
+                    df_digi["track_id"].append(hit.GetTrackID())
+                    df_digi["E_nu"].append(E_nu)
+                    df_digi["theta_nu"].append(np.arccos(Pz_nu / E_nu)*180/np.pi)
+                    df_digi["px_nu"].append(Px_nu)
+                    df_digi["py_nu"].append(Py_nu)
+                    df_digi["pz_nu"].append(Pz_nu)
+                    df_digi["x_nu"].append(X_nu)
+                    df_digi["y_nu"].append(Y_nu)
+                    df_digi["z_nu"].append(Z_nu)
+                    df_digi["pdg_nu"].append(event.MCTrack[0].GetPdgCode())
+                    df_digi["fiber_id"].append(fiber_id)
+                    df_digi["layer_type"].append(int(hit.GetDetectorID() / 1e5) % 10)
+                    df_digi["fiber_id_local"].append(fiber_id_local)
+                    df_digi["layer_id"].append(int(hit.GetDetectorID() / 1e6) % 100)
+                    df_digi["x"].append(hit.GetX())
+                    df_digi["y"].append(hit.GetY())
+                    df_digi["z"].append(hit.GetZ())
+                    df_digi["pdg"].append(hit.PdgCode())
+                    df_digi["Eloss"].append(hit.GetEnergyLoss())
+
         df_digi = pd.DataFrame(df_digi)
 
         self.df_digi = df_digi
-                
+
+
+
+
 
 
 
@@ -897,8 +1045,8 @@ def main():
     parser.add_argument("--fiber_pitch", type=float, default=0.1, help="Fiber pitch")
     parser.add_argument("--width", type=float, default=50, help="Detector width")
     parser.add_argument("--height", type=float, default=50, help="Detector height")
-    parser.add_argument("--startZ", type=float, default=-3511.7150, help="Start Z coordinate")
-    parser.add_argument("--endZ", type=float, default=-3175.5650, help="End Z coordinate")
+    parser.add_argument("--startZ", type=float, default=-3521.7150, help="Start Z coordinate")
+    parser.add_argument("--endZ", type=float, default=-3185.5650, help="End Z coordinate")
     parser.add_argument("--angle", type=float, default=5, help="Detector tilt angle")
     parser.add_argument("--Eloss_threshold", type=float, default=180, help="Energy loss threshold")
     parser.add_argument("--event_id", type=int, default=22, help="Event ID to display")
@@ -909,10 +1057,12 @@ def main():
     parser.add_argument("--output", type=str, default="event_histograms.root", help="Output filename (used in single mode)")
     parser.add_argument("--mode_batch", type=str, default="single", choices=["single", "batch"], help="Run on one file or batch of 1–1000")
     parser.add_argument("--batch_flavor", type=str, default="14", choices=["12", "14", "16"], help="Choose flavor")
+    parser.add_argument("--hardcoded", action='store_true', help="Use hardcoded fiber structure")
     args = parser.parse_args()
-
+    print("check")
+    print(args.mode_batch)
     if args.mode_batch == "batch":
-        pattern = f"/eos/experiment/ship/user/edursov/pycondor_out/CCDIS_100k_1/{args.batch_flavor}/*/ship.conical.Genie-TGeant4.root"
+        pattern = f"/eos/experiment/ship/user/edursov/pycondor_out/CCDIS_500k_1/{args.batch_flavor}/*/ship.conical.Genie-TGeant4.root"
         input_files = sorted(glob.glob(pattern))
         if not input_files:
             print(f"No files found matching pattern: {pattern}")
@@ -924,8 +1074,9 @@ def main():
                 continue
             print(f"Processing {input_path}")
             run_single(input_path, output_path, args)
-        else:
-            run_single(args.input, args.output, args)
+    else:
+        print("check")
+        run_single(args.input, args.output, args)
 
 def run_single(input_file, output_file, args):
     fiber_dimensions = {
@@ -943,11 +1094,14 @@ def run_single(input_file, output_file, args):
     analyzer = FairShipAnalyzer(input_file, detector_properties, fiber_dimensions)
     if analyzer.chain is None:
         print(f"Error: Unable to open file {input_file}.")
-        return 
-    analyzer.create_fiber_structure()
-
+        return
+    analyzer.create_fiber_structure(hardcoded=args.hardcoded)
+    print("check")
     if args.mode == "display":
-        analyzer.event_display_digi_new(args.event_id, args.plot_type, args.plot_coords)
+        print("check")
+        # analyzer.event_display_digi_new(args.event_id, args.plot_type, args.plot_coords)
+        analyzer.event_display(args.event_id, coord="z")
+        analyzer.event_display_1(args.event_id, coord="3d")
     elif args.mode == "store":
         analyzer.store_events_3_histograms(filename=output_file, plot_type=args.plot_type)
     elif args.mode == "read":

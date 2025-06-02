@@ -87,6 +87,7 @@ def generate_genie_events(
         + str(emin)
         + ","
         + str(emax)
+        + "--message-thresholds $GENIE/config/Messenger_laconic.xml"
     )
     cmd = (
         cmd
