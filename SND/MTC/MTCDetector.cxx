@@ -249,7 +249,7 @@ void MTCDetector::CreateSciFiModule(const char* name,
     fFiberLength    = fSciFiActiveY / cos(radAngle);
     Int_t numFiberLayers = 6;
     Double_t layerThick     = fiberMatThick / numFiberLayers;
-    Double_t fFiberRadius   = 0.01124;
+    Double_t fFiberRadius   = 0.01125;
     fFiberPitch    = 0.025;
     Int_t   fNumFibers     = static_cast<Int_t>(fSciFiActiveX / fFiberPitch);
 
@@ -306,7 +306,8 @@ void MTCDetector::SiPMOverlap()
 	Int_t fNSiPMs  = 7;
     // fSciFiActiveX / (fNSiPMChan * fWidthChannel);
 	Int_t fNMats   = 1;
-	Double_t fEdge = 0.205;
+	Double_t fEdge = 0.413 - 0.025 / 2;
+    Double_t initial_shift = fFiberLength*sin(5*TMath::DegToRad()) / 2;
 	Double_t fCharr = 64 * fWidthChannel;
 	Double_t firstChannelX = -fSciFiActiveX/2;
 
@@ -315,9 +316,12 @@ void MTCDetector::SiPMOverlap()
     //To obtain SiPM map for vertical fiber plane rotate by 90 degrees around Z
     TGeoVolumeAssembly *SiPMmapVol = new TGeoVolumeAssembly("SiPMmapVol");
 
-    TGeoVolume*ChannelVol = gGeoManager->MakeBox("ChannelVol", 0, fWidthChannel/2, fLengthScifiMat/2, fiberMatThick/2);
-    ChannelVol->SetLineColor(kRed);
-    ChannelVol->SetVisibility(kTRUE);
+    // TGeoVolume*ChannelVol = gGeoManager->MakeBox("ChannelVol", 0, fWidthChannel/2, fLengthScifiMat/2, fiberMatThick/2);
+    TGeoBBox* ChannelVol_box = new TGeoBBox("ChannelVol",
+                                        fWidthChannel/2, fLengthScifiMat/2, fiberMatThick/2);
+    TGeoVolume* ChannelVol = new TGeoVolume("ChannelVol", ChannelVol_box, gGeoManager->GetMedium("silicon"));
+    // ChannelVol->SetLineColor(kRed);
+    // ChannelVol->SetVisibility(kTRUE);
     //DetID for each channel:
     //first digit: mat number (0-2)
     //second digit: SiPM number (0-3)
@@ -326,7 +330,7 @@ void MTCDetector::SiPMOverlap()
     Double_t SiPMArray_fullwidth = fEdge+fCharr+fCharrGap+fCharr+fEdge;
     TGeoVolumeAssembly *SiPMArrayVol;
     int N = fNMats == 1 ? 1 : 0;
-    Double_t pos = fEdge+firstChannelX;
+    Double_t pos = fEdge+firstChannelX+initial_shift;
     for (int imat = 0; imat < fNMats; imat++){
       for (int isipms = 0; isipms < fNSiPMs; isipms++){
         // pos+= fEdge;
@@ -369,11 +373,14 @@ void MTCDetector::GetPosition(Int_t fDetectorID, TVector3& A, TVector3& B)
 	TString sLocalID;
 	sLocalID.Form("%i", local_fibre_id);
 
-	TString sID;
+	TString sID, stationID;
 	sID.Form("%i",fDetectorID);
+    stationID.Form("%i", station_number);
     // /cave/MTC_1/MTC_layer_1/MTC_sciFi_mother_1/MTC_sciFi_epoxyMat_U_1/FiberVol_101010187
-	TString path = "/cave/MTC_1/MTC_layer_" + TString(sID(1,3)) + "/MTC_sciFi_U_0" + "/MTC_sciFi_epoxyMat_0" + "/FiberVol_101";
-	path += sID(4,8);
+	TString path = "/cave/MTC_1/MTC_layer_" + stationID + "/MTC_scifi_U_0" + "/MTC_epoxyMat_0" + "/FiberVol_1010";
+    //  + "/FiberVol_101"
+	path += sID(4,5);
+    // cout << sLocalID << " " << sID << " " << path << endl;
 	TGeoNavigator* nav = gGeoManager->GetCurrentNavigator();
 	nav->cd(path);
 	LOG(DEBUG) <<path<<" "<<fDetectorID;
@@ -394,7 +401,7 @@ TVector3 MTCDetector::GetLocalPos(Int_t fDetectorID, TVector3* glob){
 	TString sID;
 	sID.Form("%i",fDetectorID);
     // /cave/MTC_1/MTC_layer_1/MTC_sciFi_mother_1/MTC_sciFi_epoxyMat_U_1/FiberVol_101010187
-	TString path = "/cave/MTC_1/MTC_layer_" + TString(sID(1,3)) + "/MTC_sciFi_U_0" + "/MTC_sciFi_epoxyMat_0";
+	TString path = "/cave/MTC_1/MTC_layer_" + TString(sID(1,2)) + "/MTC_sciFi_U_0" + "/MTC_sciFi_epoxyMat_0";
 	TGeoNavigator* nav = gGeoManager->GetCurrentNavigator();
 	nav->cd(path);
 	Double_t aglob[3];
@@ -514,8 +521,11 @@ void MTCDetector::SiPMmapping(){
 			}
 			Float_t t2 = fibre->GetMatrix()->GetTranslation()[0];
 			Int_t fID = fibre->GetNumber()%100000 + imat*1e4;     // local fibre number, global fibre number = SO+fID
-			Float_t a = t1+t2;
-            // cout << Form("Processing fibre %d, imat=%d, a=%.3f, fibresRadius=%.3f", fID, imat, a, fibresRadius) << endl;
+			// Float_t a = t1+t2;
+            TVector3 Atop, Bbot;
+            GetPosition(fibre->GetNumber(), Atop, Bbot);
+            Float_t a = Atop[0];
+            // cout << Form("Processing fibre %d, fiberlength*sin5/2=%.3f, t2=%.3f, A_x=%.3f, a=%.3f, A_x-a=%.3f, fibresRadius=%.3f", fID, 25*tan(5*TMath::DegToRad()), t2, Atop[0], a, Atop[0] - a,  fibresRadius) << endl;
 
 	//  check for overlap with any of the SiPM channels in the same mat
 			for(Int_t nChan = 0; nChan< Nodes->GetEntriesFast();nChan++){        // 12 SiPMs total and 4 SiPMs per mat times 128 channels
@@ -525,17 +535,18 @@ void MTCDetector::SiPMmapping(){
 				Float_t xcentre = vol->GetMatrix()->GetTranslation()[0];
 				if  (dSiPM<0){
 					TGeoBBox* B = dynamic_cast<TGeoBBox*>(vol->GetVolume()->GetShape());
-					dSiPM = B->GetDY();
+					dSiPM = B->GetDX();
 				}
                 // cout << Form("Checking SiPM %d in mat %d, xcentre=%.3f, a=%.3f, dSiPM=%.3f", N, imat, xcentre, a, dSiPM) << endl;
 				if (TMath::Abs(xcentre-a)>4*fibresRadius){ continue;} // no need to check further
+                // cout << Form("!! SiPM %d, fibre %d, dSiPM=%.3f, a=%.3f", N, fID, dSiPM, a) << endl;
 				Float_t W = area(a,fibresRadius,xcentre-dSiPM,xcentre+dSiPM);
 				if (W<0){ continue;}
 				std::array<float, 2> Wa;
 				Wa[0] = W;
 				Wa[1] = a;
 				fibresSiPM[N][fID] = Wa;
-                // cout << Form("SiPM %d, fibre %d, W=%.3f, a=%.3f", N, fID, W, a) << endl;
+                cout << Form("!! SiPM %d, fibre %d, W=%.3f, [xcentre - dSiPM=%.3f, xcentre + dSiPM=%.3f], a=%.3f", N, fID, W, xcentre-dSiPM,xcentre+dSiPM, a) << endl;
 			}
 		}
 	}
@@ -563,6 +574,7 @@ void MTCDetector::SiPMmapping(){
 		{
 			Int_t nfibre = itx->first;
 			siPMFibres[nfibre][N]=itx->second;
+            cout << Form("!!!! SiPM %d, fibre %d, W=%.3f, a=%.3f", N, nfibre, (itx->second)[0], (itx->second)[1]) << endl;
 		}
 	}
 }
@@ -581,6 +593,7 @@ void MTCDetector::ConstructGeometry()
     TGeoMedium* ironMed = gGeoManager->GetMedium("iron");
     // For the scintillator, you may use the same medium as SciFiMat or another if defined.
     TGeoMedium* scintMed = gGeoManager->GetMedium("SciFiMat");
+    InitMedium("silicon");
 
 
     // Define the module spacing based on three sublayers:
