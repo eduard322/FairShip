@@ -102,6 +102,7 @@ Int_t MTCDetector::InitMedium(const char* name)
 
 void MTCDetector::SetMTCParameters(Double_t w,
                                    Double_t h,
+                                   Double_t angle,
                                    Double_t iron,
                                    Double_t sciFi,
                                    Double_t scint,
@@ -111,6 +112,7 @@ void MTCDetector::SetMTCParameters(Double_t w,
 {
     fWidth = w;
     fHeight = h;
+    fSciFiBendingAngle = angle;
     fIronThick = iron;
     fSciFiThick = sciFi;
     fScintThick = scint;
@@ -241,7 +243,6 @@ void MTCDetector::CreateSciFiModule(const char* name,
     // Now build the fibers inside each Epoxy block:
 
     // Common fiber parameters (cm)
-    Double_t fSciFiBendingAngle = 5;
     Double_t radAngle       = fSciFiBendingAngle * TMath::DegToRad();
     fSciFiActiveX  = width - width * tan(radAngle);
     cout << "SciFi active X: " << fSciFiActiveX << "  " << width  << "  " << radAngle <<  "  " << fSciFiBendingAngle << endl;
@@ -307,38 +308,50 @@ void MTCDetector::SiPMOverlap()
     // fSciFiActiveX / (fNSiPMChan * fWidthChannel);
 	Int_t fNMats   = 1;
 	Double_t fEdge = 0.413 - 0.025 / 2;
-    Double_t initial_shift = fFiberLength*sin(5*TMath::DegToRad()) / 2;
+    Double_t initial_shift = fFiberLength*sin(fSciFiBendingAngle*TMath::DegToRad()) / 2;
 	Double_t fCharr = 64 * fWidthChannel;
 	Double_t firstChannelX = -fSciFiActiveX/2;
 
 
     //Contains all plane SiPMs, defined for horizontal fiber plane
     //To obtain SiPM map for vertical fiber plane rotate by 90 degrees around Z
-    TGeoVolumeAssembly *SiPMmapVol = new TGeoVolumeAssembly("SiPMmapVol");
+    TGeoVolumeAssembly *SiPMmapVolU = new TGeoVolumeAssembly("SiPMmapVolU");
+    TGeoVolumeAssembly *SiPMmapVolV = new TGeoVolumeAssembly("SiPMmapVolV");
 
     // TGeoVolume*ChannelVol = gGeoManager->MakeBox("ChannelVol", 0, fWidthChannel/2, fLengthScifiMat/2, fiberMatThick/2);
     TGeoBBox* ChannelVol_box = new TGeoBBox("ChannelVol",
                                         fWidthChannel/2, fLengthScifiMat/2, fiberMatThick/2);
     TGeoVolume* ChannelVol = new TGeoVolume("ChannelVol", ChannelVol_box, gGeoManager->GetMedium("silicon"));
-    // ChannelVol->SetLineColor(kRed);
-    // ChannelVol->SetVisibility(kTRUE);
-    //DetID for each channel:
-    //first digit: mat number (0-2)
-    //second digit: SiPM number (0-3)
-    //last three digits: channel number (0-127)
 
-    Double_t SiPMArray_fullwidth = fEdge+fCharr+fCharrGap+fCharr+fEdge;
-    TGeoVolumeAssembly *SiPMArrayVol;
+  /*
+    Example of fiberID: 123051820, where:
+      - 1: MTC unique ID
+      - 23: layer number
+      - 0: station type (0 for +5 degrees, 1 for -5 degrees, 2 for scint plane)
+      - 5: z-layer number (0-5)
+      - 1820: local fibre ID within the station
+    Example of SiPM global channel (what is seen in the output file): 123004123, where:
+      - 1: MTC unique ID
+      - 23: layer number
+      - 0: station type (0 for +5 degrees, 1 for -5 degrees)
+      - 0: mat number (only 0 by June 2025)
+      - 4: SiPM number (0-N, where N is the number of SiPMs in the station)
+      - 123: number of the SiPM channel (0-127, 128 channels per SiPM)
+  */
+
     int N = fNMats == 1 ? 1 : 0;
     Double_t pos = fEdge+firstChannelX+initial_shift;
     for (int imat = 0; imat < fNMats; imat++){
       for (int isipms = 0; isipms < fNSiPMs; isipms++){
         // pos+= fEdge;
         for (int ichannel = 0; ichannel < fNSiPMChan; ichannel++){
-            SiPMmapVol->AddNode(ChannelVol, imat*10000+isipms *1000 + ichannel, new TGeoTranslation(pos, 0, 0));
-            cout << Form("Adding SiPM channel %d at position %.3f", imat*10000+isipms *1000 + ichannel, pos) << endl;
+            // +5 degrees
+            SiPMmapVolU->AddNode(ChannelVol, 100000*0 + imat*10000+isipms *1000 + ichannel, new TGeoTranslation(pos, 0, 0));
+            // -5 degrees
+            SiPMmapVolV->AddNode(ChannelVol, 100000*1 + imat*10000+isipms *1000 + ichannel, new TGeoTranslation(-pos, 0, 0));
+            // cout << Form("Adding SiPM channel %d at position %.3f", imat*10000+isipms *1000 + ichannel, pos) << endl;
             pos += fWidthChannel;
-            // if (ichannel==(fNSiPMChan/2-1)){pos += fCharrGap;}
+
         }
         // pos+=fEdge+fBigGap;
     }
@@ -348,42 +361,40 @@ void MTCDetector::SiPMOverlap()
 
 void MTCDetector::GetPosition(Int_t fDetectorID, TVector3& A, TVector3& B)
 {
-//	TGeoVolumeAssembly *SiPMmapVol = gGeoManager->FindVolumeFast("SiPMmapVol");
-//	if(!SiPMmapVol ){SiPMmapVol=SiPMOverlap();}
-
-/* STMRFFF
- First digit S: 			station # within the sub-detector
- Second digit T: 		type of the plane: 0-horizontal fiber plane, 1-vertical fiber plane
- Third digit M: 			determines the mat number
- Fourth digit R: 		row number (in Z direction)
- Last three digits F: 	fiber number
- Ee8 ([1]) + De6 ([0..45]) + Ce5 ([0,1,2]) + Be4 ([0..6]) + A ([0..1825])
-   EDDCBAAAA
-   First digit E: MTC unique ID
-   Second digit D: 0-45, station number
-   Third digit C: 0-2, mat number (0-1 - Scifi, 2 - Scint)
-   Fourth digit B: 0-6, row number for Scifi (in Z direction)
-   Last four digits A: 0-1825, fiber number
-*/
+  /*
+    Example of fiberID: 123051820, where:
+      - 1: MTC unique ID
+      - 23: layer number
+      - 0: station type (0 for +5 degrees, 1 for -5 degrees, 2 for scint plane)
+      - 5: z-layer number (0-5)
+      - 1820: local fibre ID within the station
+    Example of SiPM global channel (what is seen in the output file): 123004123, where:
+      - 1: MTC unique ID
+      - 23: layer number
+      - 0: station type (0 for +5 degrees, 1 for -5 degrees)
+      - 0: mat number (only 0 by June 2025)
+      - 4: SiPM number (0-N, where N is the number of SiPMs in the station)
+      - 123: number of the SiPM channel (0-127, 128 channels per SiPM)
+  */
 
 	Int_t station_number = int(fDetectorID/1e6) % 100;
+    Int_t plane_type = int(fDetectorID/1e5) % 10; // 0 for horizontal, 1 for vertical
 	Int_t mat_number = int(fDetectorID/1e4) % 10;
 
-	Int_t local_fibre_id = fDetectorID % 100000;
-	TString sLocalID;
-	sLocalID.Form("%i", local_fibre_id);
 
 	TString sID, stationID;
 	sID.Form("%i",fDetectorID);
     stationID.Form("%i", station_number);
     // /cave/MTC_1/MTC_layer_1/MTC_sciFi_mother_1/MTC_sciFi_epoxyMat_U_1/FiberVol_101010187
-	TString path = "/cave/MTC_1/MTC_layer_" + stationID + "/MTC_scifi_U_0" + "/MTC_epoxyMat_0" + "/FiberVol_1010";
-    //  + "/FiberVol_101"
+    TString path;
+    if (plane_type == 0) {
+        path = "/cave/MTC_1/MTC_layer_" + stationID + "/MTC_scifi_U_0" + "/MTC_epoxyMat_0" + "/FiberVol_1010";
+    } else {
+        path = "/cave/MTC_1/MTC_layer_" + stationID + "/MTC_scifi_V_0" + "/MTC_epoxyMat_0" + "/FiberVol_1011";
+    }
 	path += sID(4,5);
-    // cout << sLocalID << " " << sID << " " << path << endl;
 	TGeoNavigator* nav = gGeoManager->GetCurrentNavigator();
 	nav->cd(path);
-	LOG(DEBUG) <<path<<" "<<fDetectorID;
 	TGeoNode* W = nav->GetCurrentNode();
 	TGeoBBox* S = dynamic_cast<TGeoBBox*>(W->GetVolume()->GetShape());
 
@@ -398,10 +409,17 @@ void MTCDetector::GetPosition(Int_t fDetectorID, TVector3& A, TVector3& B)
 }
 
 TVector3 MTCDetector::GetLocalPos(Int_t fDetectorID, TVector3* glob){
-	TString sID;
+	Int_t station_number = int(fDetectorID/1e6) % 100;
+
+	Int_t local_fibre_id = fDetectorID % 100000;
+	TString sLocalID;
+	sLocalID.Form("%i", local_fibre_id);
+
+	TString sID, stationID;
 	sID.Form("%i",fDetectorID);
+    stationID.Form("%i", station_number);
     // /cave/MTC_1/MTC_layer_1/MTC_sciFi_mother_1/MTC_sciFi_epoxyMat_U_1/FiberVol_101010187
-	TString path = "/cave/MTC_1/MTC_layer_" + TString(sID(1,2)) + "/MTC_sciFi_U_0" + "/MTC_sciFi_epoxyMat_0";
+	TString path = "/cave/MTC_1/MTC_layer_" + stationID + "/MTC_scifi_U_0" + "/MTC_epoxyMat_0";
 	TGeoNavigator* nav = gGeoManager->GetCurrentNavigator();
 	nav->cd(path);
 	Double_t aglob[3];
@@ -416,28 +434,35 @@ void MTCDetector::GetSiPMPosition(Int_t SiPMChan, TVector3& A, TVector3& B)
 /* STMRFFF
  First digit S: 		station # within the sub-detector
  Second digit T: 		type of the plane: 0-tilted to the right fiber plane, 1-tilted to the left fiber plane
- Third digit M: 		determines the mat number 0-2
- Fourth digit S: 		SiPM number  0-3
+ Third digit M: 		determines the mat number 0
+ Fourth digit S: 		SiPM number  0-7
  Last three digits F: 	local SiPM channel number in one mat  0-127
+ Ee8 ([1]) + De6 ([0..45]) + Ce5 ([0,1,2]) + Be4 ([0..6]) + A ([0..1825])
+   EDDCBAAAA
+   First digit E: MTC unique ID
+   Second digit D: 0-45, station number
+   Third digit C: 0-2, plane number (0-1 - Scifi, 2 - Scint)
+   Fourth digit B: 0-6, row number for Scifi (in Z direction)
+   Last four digits A: 0-1825, fiber number
 */
-	Int_t locNumber            = SiPMChan%100000;
-	Int_t globNumber         = int(SiPMChan/100000)*100000;
-	Float_t locPosition        = SiPMPos[locNumber]; // local position in plane of reference plane.
-	Int_t fNMats   = 1;
+	Int_t locNumber            = SiPMChan%1000000;
+	Int_t station_number = int(SiPMChan/1e6) % 100;
+    Int_t plane_type = int(SiPMChan/1e5) % 10; // 0 for horizontal, 1 for vertical
+    Float_t locPosition;
+    if (plane_type == 0) locPosition = SiPMPos_U[locNumber]; // local position in U plane
+    else locPosition = SiPMPos_V[locNumber]; // local position in V plane
+    TString stationID;
+	stationID.Form("%i", station_number);
 
 
-	TString sID;
-	sID.Form("%i",SiPMChan);
-	Int_t digits = fNMats==1 ? 2 : 1;
-	locPosition += 0;
-	Float_t rotPhi = 0;
-	Float_t rotPsi = 0;
-	Float_t rotTheta = 0;
 
 	Double_t loc[3] = {0,0,0};
-    // /cave/MTC_1/MTC_layer_1/MTC_sciFi_mother_1/MTC_sciFi_epoxyMat_U_1/FiberVol_101010187
-	TString path = "/cave/MTC_1/MTC_layer_" + TString(sID(1,3)) + "/MTC_sciFi_U_0" + "/MTC_sciFi_epoxyMat_0";
-	path += sID(4,8);
+    TString path;
+    if (plane_type == 0) {
+        path = "/cave/MTC_1/MTC_layer_" + stationID + "/MTC_scifi_U_0/MTC_epoxyMat_0";
+    } else {
+        path = "/cave/MTC_1/MTC_layer_" + stationID + "/MTC_scifi_V_0/MTC_epoxyMat_0";
+    }
 	TGeoNavigator* nav = gGeoManager->GetCurrentNavigator();
 	Double_t glob[3] = {0,0,0};
     loc[0] = locPosition;
@@ -496,18 +521,30 @@ Double_t MTCDetector::area(Double_t a,Double_t R,Double_t xL,Double_t xR)
 }
 
 void MTCDetector::SiPMmapping(){
+    // check if containers are already filled
+    if (!fibresSiPM_U.empty() || !fibresSiPM_V.empty() || !SiPMPos_U.empty() || !SiPMPos_V.empty()) {
+        cout << "SiPM mapping already done, skipping." << endl;
+        return;
+    }
 	Float_t fibresRadius = -1;
 	Float_t dSiPM = -1;
 	TGeoNode* vol;
 	TGeoNode* fibre;
     cout << "!!!!!!!! Processing MTC plane " << endl;
 	SiPMOverlap();           // 12 SiPMs per mat, made for horizontal mats, fibres staggered along y-axis.
-	auto sipm    = gGeoManager->FindVolumeFast("SiPMmapVol");
-	TObjArray* Nodes = sipm->GetNodes();
-	auto plane  = gGeoManager->FindVolumeFast("MTC_scifi_U");
-    // cout << "!!!!!!!! Processing MTC plane " << endl;
-    // cout << "!!!!!!!! Processing MTC plane " << plane->GetName() << Nodes->GetName() << endl;
-	for (int imat = 0; imat < plane->GetNodes()->GetEntries(); imat++){
+    // Loop over both U and V planes
+    std::vector<std::pair<const char*, const char*>> sipm_planes = {
+        {"SiPMmapVolU", "MTC_scifi_U"},
+        {"SiPMmapVolV", "MTC_scifi_V"}
+    };
+    for (const auto& pair : sipm_planes) {
+        auto sipm = gGeoManager->FindVolumeFast(pair.first);
+        if (!sipm) continue;
+        TObjArray* Nodes = sipm->GetNodes();
+        auto plane = gGeoManager->FindVolumeFast(pair.second);
+        if (!plane) continue;
+        for (int imat = 0; imat < plane->GetNodes()->GetEntries(); imat++) {
+            // original code continues here
         // cout << "!!!!!!!! Processing material " << imat << " in MTC plane";
 		auto mat =  static_cast<TGeoNode*>(plane->GetNodes()->At(imat));
 		Float_t t1 = mat->GetMatrix()->GetTranslation()[0];
@@ -520,7 +557,8 @@ void MTCDetector::SiPMmapping(){
 				fibresRadius = S->GetDX();
 			}
 			Float_t t2 = fibre->GetMatrix()->GetTranslation()[0];
-			Int_t fID = fibre->GetNumber()%100000 + imat*1e4;     // local fibre number, global fibre number = SO+fID
+			// Int_t fID = fibre->GetNumber()%100000 + imat*1e4;     // local fibre number, global fibre number = SO+fID
+            Int_t fID = fibre->GetNumber() % 1000000;
 			// Float_t a = t1+t2;
             TVector3 Atop, Bbot;
             GetPosition(fibre->GetNumber(), Atop, Bbot);
@@ -528,10 +566,11 @@ void MTCDetector::SiPMmapping(){
             // cout << Form("Processing fibre %d, fiberlength*sin5/2=%.3f, t2=%.3f, A_x=%.3f, a=%.3f, A_x-a=%.3f, fibresRadius=%.3f", fID, 25*tan(5*TMath::DegToRad()), t2, Atop[0], a, Atop[0] - a,  fibresRadius) << endl;
 
 	//  check for overlap with any of the SiPM channels in the same mat
-			for(Int_t nChan = 0; nChan< Nodes->GetEntriesFast();nChan++){        // 12 SiPMs total and 4 SiPMs per mat times 128 channels
+			for(Int_t nChan = 0; nChan< Nodes->GetEntriesFast();nChan++){        // 7 SiPMs total times 128 channels
 				vol = static_cast<TGeoNode*>(Nodes->At(nChan));
-				Int_t N = vol->GetNumber()%100000;
-				if (imat!=int(N/10000)){continue;}
+				// Int_t N = vol->GetNumber()%100000;
+                Int_t N = vol->GetNumber();
+				// if (imat!=int(N/10000)){continue;}
 				Float_t xcentre = vol->GetMatrix()->GetTranslation()[0];
 				if  (dSiPM<0){
 					TGeoBBox* B = dynamic_cast<TGeoBBox*>(vol->GetVolume()->GetShape());
@@ -545,39 +584,68 @@ void MTCDetector::SiPMmapping(){
 				std::array<float, 2> Wa;
 				Wa[0] = W;
 				Wa[1] = a;
-				fibresSiPM[N][fID] = Wa;
-                cout << Form("!! SiPM %d, fibre %d, W=%.3f, [xcentre - dSiPM=%.3f, xcentre + dSiPM=%.3f], a=%.3f", N, fID, W, xcentre-dSiPM,xcentre+dSiPM, a) << endl;
+				// fibresSiPM[N][fID] = Wa;
+                if(pair.first == std::string("SiPMmapVolU")) {
+                    fibresSiPM_U[N][fID] = Wa;
+                    cout << Form("!! U: SiPM %d, fibre %d, W=%.3f, [xcentre - dSiPM=%.3f, xcentre + dSiPM=%.3f], a=%.3f", N, fID, W, xcentre-dSiPM,xcentre+dSiPM, a) << endl;
+                }
+                else {
+                    fibresSiPM_V[N][fID] = Wa;
+                    cout << Form("!! V: SiPM %d, fibre %d, W=%.3f, [xcentre - dSiPM=%.3f, xcentre + dSiPM=%.3f], a=%.3f", N, fID, W, xcentre-dSiPM,xcentre+dSiPM, a) << endl;
+                }
 			}
 		}
 	}
-  // calculate also local SiPM positions based on fibre positions and their fraction
-  // probably an overkill, maximum difference between weighted average and central position < 6 micron.
-	std::map<Int_t,std::map<Int_t,std::array<float, 2>>>::iterator it;
-	std::map<Int_t,std::array<float, 2>>::iterator itx;
-	for (it = fibresSiPM.begin(); it != fibresSiPM.end(); it++)
-	{
-		Int_t N = it->first;
-		Float_t m = 0;
-		Float_t w = 0;
-		for (itx = it->second.begin(); itx != it->second.end(); itx++)
-		{
-			m+=(itx->second)[0]*(itx->second)[1];
-			w+=(itx->second)[0];
-		}
-		SiPMPos[N]=m/w;
-	}
-// make inverse mapping, which fibre is associated to which SiPMs
-	for (it = fibresSiPM.begin(); it != fibresSiPM.end(); it++)
-	{
-		Int_t N = it->first;
-		for (itx = it->second.begin(); itx != it->second.end(); itx++)
-		{
-			Int_t nfibre = itx->first;
-			siPMFibres[nfibre][N]=itx->second;
-            cout << Form("!!!! SiPM %d, fibre %d, W=%.3f, a=%.3f", N, nfibre, (itx->second)[0], (itx->second)[1]) << endl;
-		}
-	}
+    // calculate also local SiPM positions based on fibre positions and their fraction
+    // probably an overkill, maximum difference between weighted average and central position < 6 micron.
+    if (pair.first == std::string("SiPMmapVolU")) {
+        std::map<Int_t, std::map<Int_t, std::array<float, 2>>>::iterator it;
+        std::map<Int_t, std::array<float, 2>>::iterator itx;
+        for (it = fibresSiPM_U.begin(); it != fibresSiPM_U.end(); it++) {
+            Int_t N = it->first;
+            Float_t m = 0;
+            Float_t w = 0;
+            for (itx = it->second.begin(); itx != it->second.end(); itx++) {
+                m += (itx->second)[0] * (itx->second)[1];
+                w += (itx->second)[0];
+            }
+            SiPMPos_U[N] = m / w;
+        }
+        // make inverse mapping, which fibre is associated to which SiPMs
+        for (it = fibresSiPM_U.begin(); it != fibresSiPM_U.end(); it++) {
+            Int_t N = it->first;
+            for (itx = it->second.begin(); itx != it->second.end(); itx++) {
+                Int_t nfibre = itx->first;
+                siPMFibres_U[nfibre][N] = itx->second;
+                // cout << Form("!!!! U: SiPM %d, fibre %d, W=%.3f, a=%.3f", N, nfibre, (itx->second)[0], (itx->second)[1]) << endl;
+            }
+        }
+    } else if (pair.first == std::string("SiPMmapVolV")) {
+        std::map<Int_t, std::map<Int_t, std::array<float, 2>>>::iterator it;
+        std::map<Int_t, std::array<float, 2>>::iterator itx;
+        for (it = fibresSiPM_V.begin(); it != fibresSiPM_V.end(); it++) {
+            Int_t N = it->first;
+            Float_t m = 0;
+            Float_t w = 0;
+            for (itx = it->second.begin(); itx != it->second.end(); itx++) {
+                m += (itx->second)[0] * (itx->second)[1];
+                w += (itx->second)[0];
+            }
+            SiPMPos_V[N] = m / w;
+        }
+        // make inverse mapping, which fibre is associated to which SiPMs
+        for (it = fibresSiPM_V.begin(); it != fibresSiPM_V.end(); it++) {
+            Int_t N = it->first;
+            for (itx = it->second.begin(); itx != it->second.end(); itx++) {
+                Int_t nfibre = itx->first;
+                siPMFibres_V[nfibre][N] = itx->second;
+                // cout << Form("!!!! V: SiPM %d, fibre %d, W=%.3f, a=%.3f", N, nfibre, (itx->second)[0], (itx->second)[1]) << endl;
+            }
+        }
+    }
+    }
 }
+
 
 
 
@@ -666,7 +734,7 @@ Bool_t MTCDetector::ProcessHits(FairVolume* vol)
         // cout << "detID_1: " << detID_1 << "  " << fELoss << endl;
 		Int_t layer_id = nav->GetMother(3)->GetNumber(); // Get layer ID.
         fVolumeID = 100000000 + layer_id * 1000000 + vol_local_id; // 1e8 + layer_id * 1e6 + fibre_local_id;
-        cout << "MTCDetector::ProcessHits: fVolumeID = " << fVolumeID << "  " << nav->GetMother(3)->GetNumber() << endl;
+        // cout << "MTCDetector::ProcessHits: fVolumeID = " << fVolumeID << "  " << nav->GetMother(3)->GetNumber() << endl;
     }
     // Sum energy loss for all steps in the active volume
     fELoss += gMC->Edep();
@@ -686,7 +754,7 @@ Bool_t MTCDetector::ProcessHits(FairVolume* vol)
         gMC->CurrentVolID(detID_1);
 		// Int_t vol_local_id = nav->GetNumber() % 1000000; // Local ID within the mat or scint.
         // Int_t vol_local_id = detID_1 % 1000000;
-        cout << "detID_1: " << detID_1 << "  " << fELoss << endl;
+        // cout << "detID_1: " << detID_1 << "  " << fELoss << endl;
 		// Int_t layer_id = nav->GetMother()->GetNumber(); // Get layer ID.
         // Int_t detID = 100000000 + layer_id * 1000000 + vol_local_id; // 1e8 + layer_id * 1e6 + fibre_local_id;
 
@@ -728,7 +796,7 @@ Bool_t MTCDetector::ProcessHits(FairVolume* vol)
             z = (fPos.Z() + Pos.Z()) / 2.;
             }
 
-        AddHit(fTrackID,
+        auto hit = AddHit(fTrackID,
                 fVolumeID,
                 TVector3(x, y, z),
                 TVector3(fMom.Px(), fMom.Py(), fMom.Pz()),   // entrance momentum
@@ -736,6 +804,7 @@ Bool_t MTCDetector::ProcessHits(FairVolume* vol)
                 fLength,
                 fELoss,
                 pdgCode);
+        hit->Print();
         ShipStack* stack = dynamic_cast<ShipStack*>(gMC->GetStack());
         stack->AddPoint(kMTC);
     }
@@ -780,5 +849,7 @@ MtcDetPoint* MTCDetector::AddHit(Int_t trackID,
 {
     TClonesArray& clref = *fMTCDetectorPointCollection;
     Int_t size = clref.GetEntriesFast();
+    cout << Form("MTCDetector::AddHit: Adding hit %d with detID %d at position (%.3f, %.3f, %.3f) with momentum (%.3f, %.3f, %.3f), time %.3f, length %.3f, eLoss %.3f, pdgCode %d",
+        size, detID, pos.X(), pos.Y(), pos.Z(), mom.Px(), mom.Py(), mom.Pz(), time, length, eLoss * 1.0e6, pdgCode);
     return new (clref[size]) MtcDetPoint(trackID, detID, pos, mom, time, length, eLoss, pdgCode);
 }

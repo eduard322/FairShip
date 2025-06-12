@@ -1,5 +1,5 @@
-#ifndef MTCDET_MtcDetPoint_H_
-#define MTCDET_MtcDetPoint_H_ 1
+#ifndef MtcDetPoint_H_
+#define MtcDetPoint_H_ 1
 
 #include "FairMCPoint.h"
 #include "TObject.h"
@@ -35,19 +35,30 @@ class MtcDetPoint : public FairMCPoint
     virtual ~MtcDetPoint();
 
     /** Output to screen **/
-    virtual void Print(const Option_t* opt) const;
+    virtual void Print() const;
     Int_t PdgCode() const { return fPdgCode; }
-
+    // Float_t GetEnergyLoss() const { return fEnergyLoss; }
+    // Float_t GetX() const { return fX; }
+    // Float_t GetY() const { return fY; }
+    // Float_t GetZ() const { return fZ; }
+    // Float_t GetTime() const { return fTime; }
+    // Int_t GetDetectorID() const { return fDetectorID; }
+    Int_t GetStationType() const { return int(fDetectorID / 100000) % 10; }
     Int_t GetLayer();
-
     Int_t GetLayerType();
-    /** Copy constructor **/
+    // /** Copy constructor **/
     Int_t fPdgCode;
+    // Float_t fEnergyLoss; // Energy loss in keV
+    // Float_t fX;         // X position in cm
+    // Float_t fY;         // Y position in cm
+    // Float_t fZ;         // Z position in cm
+    // Float_t fTime;      // Time in ns
+    // Int_t fDetectorID;  // Detector ID
 
     MtcDetPoint(const MtcDetPoint& point);
     MtcDetPoint operator=(const MtcDetPoint& point);
 
-    ClassDef(MtcDetPoint, 1)
+    ClassDef(MtcDetPoint, 2)
 };
 
 #endif   // MTCDET_MtcDetPoint_H_

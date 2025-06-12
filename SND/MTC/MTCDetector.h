@@ -28,6 +28,7 @@ class MTCDetector : public FairDetector
 
     void SetMTCParameters(Double_t width,
                           Double_t height,
+                          Double_t angle,
                           Double_t ironThick,
                           Double_t sciFiThick,
                           Double_t scintThick,
@@ -60,9 +61,12 @@ class MTCDetector : public FairDetector
     Double_t fraction(Double_t R,Double_t x,Double_t y);
     Double_t area(Double_t a,Double_t R,Double_t xL,Double_t xR);
     void SiPMmapping();
-    std::map<Int_t,std::map<Int_t,std::array<float, 2>>> GetSiPMmap(){return fibresSiPM;}
-    std::map<Int_t,std::map<Int_t,std::array<float, 2>>> GetFibresMap(){return siPMFibres;}
-    std::map<Int_t,float> GetSiPMPos(){return SiPMPos;}
+    std::map<Int_t,std::map<Int_t,std::array<float, 2>>> GetSiPMmapU(){return fibresSiPM_U;}
+    std::map<Int_t,std::map<Int_t,std::array<float, 2>>> GetFibresMapU(){return siPMFibres_U;}
+    std::map<Int_t,std::map<Int_t,std::array<float, 2>>> GetSiPMmapV(){return fibresSiPM_V;}
+    std::map<Int_t,std::map<Int_t,std::array<float, 2>>> GetFibresMapV(){return siPMFibres_V;}
+    std::map<Int_t,float> GetSiPMPos_U(){return SiPMPos_U;}
+    std::map<Int_t,float> GetSiPMPos_V(){return SiPMPos_V;}
     virtual void SiPMOverlap();
     virtual Bool_t ProcessHits(FairVolume* vol = 0);
     MtcDetPoint* AddHit(Int_t trackID,
@@ -116,9 +120,11 @@ class MTCDetector : public FairDetector
     Double_t fCharrGap;
     Double_t fBigGap;
     Double_t firstChannelX;
-    std::map<Int_t,std::map<Int_t,std::array<float, 2>>> fibresSiPM;  //! mapping of fibres to SiPM channels
-    std::map<Int_t,std::map<Int_t,std::array<float, 2>>> siPMFibres;  //! inverse mapping
-    std::map<Int_t,float> SiPMPos;  //! local SiPM channel position
+    std::map<Int_t,std::map<Int_t,std::array<float, 2>>> fibresSiPM_U;  //! mapping of fibres to SiPM channels
+    std::map<Int_t,std::map<Int_t,std::array<float, 2>>> siPMFibres_U;  //! inverse mapping
+    std::map<Int_t,std::map<Int_t,std::array<float, 2>>> fibresSiPM_V;  //! mapping of fibres to SiPM channels
+    std::map<Int_t,std::map<Int_t,std::array<float, 2>>> siPMFibres_V;  //! inverse mapping
+    std::map<Int_t,float> SiPMPos_U, SiPMPos_V;  //! local SiPM channel position
     /** container for data points */
     TClonesArray* fMTCDetectorPointCollection;
 
