@@ -67,6 +67,7 @@ class MTCDetector : public FairDetector
     std::map<Int_t,std::map<Int_t,std::array<float, 2>>> GetFibresMapV(){return siPMFibres_V;}
     std::map<Int_t,float> GetSiPMPos_U(){return SiPMPos_U;}
     std::map<Int_t,float> GetSiPMPos_V(){return SiPMPos_V;}
+    Float_t Get_SciFiActiveX() const { return fSciFiActiveX; }
     virtual void SiPMOverlap();
     virtual Bool_t ProcessHits(FairVolume* vol = 0);
     MtcDetPoint* AddHit(Int_t trackID,
@@ -106,20 +107,10 @@ class MTCDetector : public FairDetector
     Int_t fLayers;
     Double_t fZCenter;
     Double_t fFieldY;
-    Double_t fLengthScifiMat;
-    Double_t fWidthChannel;
     Double_t fZEpoxyMat;
     Double_t fiberMatThick;
     Double_t fFiberLength;
     Double_t fFiberPitch;
-    Int_t fNSiPMChan;
-    Int_t fNSiPMs;
-    Int_t fNMats;
-    Double_t fEdge;
-    Double_t fCharr;
-    Double_t fCharrGap;
-    Double_t fBigGap;
-    Double_t firstChannelX;
     std::map<Int_t,std::map<Int_t,std::array<float, 2>>> fibresSiPM_U;  //! mapping of fibres to SiPM channels
     std::map<Int_t,std::map<Int_t,std::array<float, 2>>> siPMFibres_U;  //! inverse mapping
     std::map<Int_t,std::map<Int_t,std::array<float, 2>>> fibresSiPM_V;  //! mapping of fibres to SiPM channels
@@ -131,7 +122,7 @@ class MTCDetector : public FairDetector
     MTCDetector(const MTCDetector&);
     MTCDetector& operator=(const MTCDetector&);
     Int_t InitMedium(const char* name);
-    ClassDef(MTCDetector, 1)
+    ClassDef(MTCDetector, 3)
 };
 
 #endif   // MTCDETECTOR_H_

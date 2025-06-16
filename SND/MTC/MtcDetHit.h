@@ -21,7 +21,7 @@ class MtcDetHit : public ShipHit
     MtcDetHit(const MtcDetHit& hit) = default;
     MtcDetHit& operator=(const MtcDetHit& hit) = default;
     //  Constructor from MtcDetPoint
-    MtcDetHit(int detID,std::vector<MtcDetPoint*>,std::vector<Float_t>);
+    MtcDetHit(int detID,const std::vector<MtcDetPoint*>&,const std::vector<Float_t>&);
 
  /** Destructor **/
     virtual ~MtcDetHit();

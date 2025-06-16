@@ -1,10 +1,8 @@
 import ROOT
 import shipDet_conf
-import rootUtils as ut
-from ShipGeoConfig import ConfigRegistry
 from rootpyPickler import Unpickler
-from array import array
-
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
 class SciFiMapping:
 	def __init__(self, modules):
@@ -14,6 +12,7 @@ class SciFiMapping:
 
 	def getFibre2SiPMCPP(self):
 		FU, FV = self.scifi.GetSiPMmapU(), self.scifi.GetSiPMmapV()
+		print("Fibre2SiPMCPP", len(FU), len(FV))
 		self.fibresSiPMU, self.fibresSiPMV  = {}, {}
 		for x1,x2 in zip(FU, FV):
 			self.fibresSiPMU[x1.first]={}
@@ -26,6 +25,7 @@ class SciFiMapping:
 
 	def getSiPM2FibreCPP(self):
 		XU, XV = self.scifi.GetFibresMapU(), self.scifi.GetFibresMapV()
+		print("SiPM2FibreCPP", len(XU), len(XV))
 		self.siPMFibresU, self.siPMFibresV = {}, {}
 		for x1, x2 in zip(XU, XV):
 			self.siPMFibresU[x1.first]={}
@@ -43,17 +43,167 @@ class SciFiMapping:
 
 	def get_siPMFibres(self):
 		return self.siPMFibresU, self.siPMFibresV
+	def get_fibresSiPM(self):
+		return self.fibresSiPMU, self.fibresSiPMV
+
+	def draw_channel(self, channel):
+		AF = ROOT.TVector3()
+		BF = ROOT.TVector3()
+		s = int(channel / 1000000)
+		plane_type = int(channel / 1e5) % 10
+		locChannel = channel % 1000000
+		fibreVol = sGeo.FindVolumeFast('FiberVol')
+		R = fibreVol.GetShape().GetDX()
+		DX = 0.025
+		DZ = 0.135
+		n = 0
+		xmin = 999.
+		xmax = -999.
+		ymin = 999.
+		ymax = -999.
+		fibre_positions = []
+		# print(self.fibresSiPMU.keys())
+		fibresSiPM = self.fibresSiPMU if plane_type == 0 else self.fibresSiPMV
+		for fibre in fibresSiPM[locChannel]:
+			globfiberID = fibre + 100000000 + 1000000 + 0 * 100000 if plane_type == 0 else fibre + 100000000 + 1000000 + 1 * 100000
+			self.scifi.GetPosition(globfiberID, AF, BF)
+			print("Fiber: ", fibre, globfiberID, AF[0], AF[1], AF[2], BF[0], BF[1], BF[2])
+			loc = self.scifi.GetLocalPos(globfiberID, AF)
+			print("Fiber local: ", fibre, globfiberID, loc[0], loc[1], loc[2])
+			fibre_positions.append((loc[0], loc[2]))
+			n += 1
+			if xmin > loc[0]: xmin = loc[0]
+			if ymin > loc[2]: ymin = loc[2]
+			if xmax < loc[0]: xmax = loc[0]
+			if ymax < loc[2]: ymax = loc[2]
+		print(xmin, xmax, ymin, ymax)
+		D = ymax - ymin + 3 * R
+		x0 = (xmax + xmin) / 2.
+		fig, ax = plt.subplots(figsize=(8, 8))
+		ax.set_xlim(x0 - D / 2, x0 + D / 2)
+		ax.set_ylim(ymin - 1.5 * R, ymax + 1.5 * R)
+		for i, (x, y) in enumerate(fibre_positions):
+			print(fibre, globfiberID, x, 0, y)
+			ellipse = patches.Ellipse((x, y), width=2 * R, height=2 * R, color='orange', alpha=0.6)
+			ax.add_patch(ellipse)
+		self.scifi.GetSiPMPosition(locChannel, AF, BF)
+		print("SiPM position", channel, AF[0], AF[1], AF[2], BF[0], BF[1], BF[2])
+		loc = self.scifi.GetLocalPos(globfiberID, AF)
+		print("SiPM local pos", loc[0], loc[1], loc[2])
+		rect = patches.Rectangle((loc[0] - DX, loc[2] - DZ), 2 * DX, 2 * DZ, linewidth=1, edgecolor='blue', facecolor='blue', alpha=0.3, hatch='//')
+		ax.add_patch(rect)
+		ax.set_xlabel('X [cm]')
+		ax.set_ylabel('Z [cm]')
+		ax.set_title(f'SiPM Mapping for Channel {channel}')
+		ax.grid(True)
+		ax.set_aspect('equal')
+		plt.savefig(f'scifi_mapping_channel_1_{channel}.pdf')
+
+
+
+	def draw_many_channels(self,
+                             output_file='scifi_mapping_all_channels.pdf',
+                             figsize=(16,16),
+                             dpi=300,
+                             cmap_name='tab20',
+                             alpha_fibre=0.4):
+
+		# Prepare fig & ax
+		fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+
+		# Select your channels. Hardcoded range for demonstration
+		channelsU = sorted(self.fibresSiPMU.keys())[:10]
+		channelsV = sorted(self.fibresSiPMV.keys())[::-1][86:96]
+		channels  = channelsU + channelsV
+		n_chan    = len(channels)
+
+		# Build a colormap for rectangles
+		cmap   = plt.get_cmap(cmap_name)
+		colors = [cmap(i/(n_chan-1)) for i in range(n_chan)]
+
+		# Geometry constants
+		fibreVol = sGeo.FindVolumeFast('FiberVol')
+		R        = fibreVol.GetShape().GetDX()
+		DX, DZ   = 0.025, 0.135/2
+
+		AF = ROOT.TVector3(); BF = ROOT.TVector3()
+
+		# Loop through all channels
+		for idx, chan in enumerate(channels):
+			col = colors[idx]
+
+			# decode station & local channel
+			s       = chan // 1_000_000
+			locChan = chan % 1_000_000
+
+			# collect fibre positions
+			xs, ys = [], []
+			for fibreID in (self.fibresSiPMU if chan in channelsU else self.fibresSiPMV)[locChan]:
+				globfiberID = fibreID + 100000000 + 1000000 + 0 * 100000 if chan in channelsU else fibreID + 100000000 + 1000000 + 1 * 100000
+				# print(f"Processing channel {chan}, fibre {fibreID} (glob: {globfiberID})")
+				self.scifi.GetPosition(globfiberID, AF, BF)
+				loc = self.scifi.GetLocalPos(fibreID, AF)
+				xs.append(loc[0]); ys.append(loc[2])
+
+			# draw fibres (still orange)
+			for x, y in zip(xs, ys):
+				ell = patches.Ellipse((x, y), 2*R, 2*R,
+										color='orange', alpha=alpha_fibre)
+				ax.add_patch(ell)
+
+			# draw SiPM rect in its unique shade
+			self.scifi.GetSiPMPosition(chan, BF, AF)
+			loc_siPM = self.scifi.GetLocalPos(fibreID, AF)
+			rx, ry   = loc_siPM[0], loc_siPM[2]
+			rect = patches.Rectangle((rx - DX, ry - DZ),
+										2*DX, 2*DZ,
+										linewidth=1,
+										edgecolor="black",
+										facecolor=col,
+										alpha=alpha_fibre*0.8,
+										hatch='//')
+			ax.add_patch(rect)
+
+			# compute a fontsize that fits the rect width
+			# 1) data→display coords:
+			p0 = ax.transData.transform((rx - DX, ry))
+			p1 = ax.transData.transform((rx + DX, ry))
+			disp_width = abs(p1[0] - p0[0])
+			# 2) convert px→points (1pt = 1/72in; fig.dpi px/inch):
+			pts = disp_width * 72.0 / fig.dpi
+			fontsize = max(4, min(12, pts * 0.8))
+
+			# label above the rect
+			text = f"SiPM: {(chan//1000) % 10} \n ch: {chan%1000}"
+			ax.text(rx - DX / 2, ry + DZ + R*0.1,
+					text,
+					ha='left', va='bottom',
+					fontsize=fontsize,
+					color='black',
+					clip_on=True)
+
+		# finalize plot
+		ax.relim()
+		ax.autoscale_view()
+		ax.set_aspect('equal')
+		ax.tick_params(axis='both', which='major', labelsize=18)
+		ax.tick_params(axis='both', which='minor', labelsize=18)
+		ax.set_xlabel('X [cm]', fontsize=20)
+		ax.set_ylabel('Z [cm]', fontsize=20)
+		ax.set_title('SiPM-Channel Mappings Overlaid', fontsize=24)
+		ax.grid(True)
+
+		plt.tight_layout()
+		plt.savefig(output_file)
+		plt.close(fig)
+		print(f"Saved overlay plot of {n_chan} channels to {output_file}")
 
 
 if __name__ == "__main__":
-	print("open geofile")
-	geoFile = "geofile_full.PG_13-TGeant4.root"
+	geoFile = "geofile_full.conical.PG_13-TGeant4.root"
 	fgeo = ROOT.TFile.Open(geoFile)
-
-#load geo dictionary
 	upkl    = Unpickler(fgeo)
 	ship_geo = upkl.load('ShipGeo')
-
 # -----Create geometry----------------------------------------------
 
 	run = ROOT.FairRunSim()
@@ -62,175 +212,13 @@ if __name__ == "__main__":
 	run.SetUserConfig("g4Config_basic.C") # geant4 transport not used
 	rtdb = run.GetRuntimeDb()
 	modules = shipDet_conf.configure(run,ship_geo)
+	run.Init()
+	print("configured geofile")
 	sGeo = fgeo.FAIRGeom
 	top = sGeo.GetTopVolume()
-
+	# -----Create SciFiMapping instance--------------------------------
 	SciFiMapping = SciFiMapping(modules)
 	SciFiMapping.make_mapping()
+	SciFiMapping.draw_channel(101104120)  # Example channel
+	SciFiMapping.draw_many_channels('scifi_mapping_all_channels.pdf')
 
-# get mapping from C++
-
-# def getFibre2SiPMCPP(scifi):
-# 	FU, FV = scifi.GetSiPMmapU(), scifi.GetSiPMmapV()
-# 	fibresSiPMU, fibresSiPMV  = {}, {}
-# 	for x1,x2 in zip(FU, FV):
-# 		fibresSiPMU[x1.first]={}
-# 		for z in x1.second:
-# 			fibresSiPMU[x1.first][z.first]={'weight':z.second[0],'xpos':z.second[1]}
-# 		fibresSiPMV[x2.first]={}
-# 		for z in x2.second:
-# 			fibresSiPMV[x2.first][z.first]={'weight':z.second[0],'xpos':z.second[1]}
-# 	return fibresSiPMU, fibresSiPMV
-
-
-# def getSiPM2FibreCPP(scifi):
-# 	XU, XV = scifi.GetFibresMapU(), scifi.GetFibresMapV()
-# 	siPMFibresU, siPMFibresV = {}, {}
-# 	for x1, x2 in zip(XU, XV):
-# 		siPMFibresU[x1.first]={}
-# 		for z in x1.second:
-# 			siPMFibresU[x1.first][z.first]={'weight':z.second[0],'xpos':z.second[1]}
-# 		siPMFibresV[x2.first]={}
-# 		for z in x2.second:
-# 			siPMFibresV[x2.first][z.first]={'weight':z.second[0],'xpos':z.second[1]}
-# 	return siPMFibresU, siPMFibresV
-
-
-# def localPosition(fibresSiPM):
-#    meanPos = {}
-#    for N in fibresSiPM:
-#         m = 0
-#         w = 0
-#         for fID in fibresSiPM[N]:
-#             m+=fibresSiPM[N][fID]['weight']*fibresSiPM[N][fID]['xpos']
-#             w+=fibresSiPM[N][fID]['weight']
-#         meanPos[N] = m/w
-#    return meanPos
-
-# h={}
-# def overlap(F,Finv):
-#    ut.bookHist(h,'W','overlap/fibre',110,0.,1.1)
-#    ut.bookHist(h,'C','coverage',50,0.,10.)
-#    ut.bookHist(h,'S','fibres/sipm',15,-0.5,14.5)
-#    ut.bookHist(h,'Eff','efficiency',110,0.,1.1)
-#    for n in F:
-#      C=0
-#      for fid in F[n]:
-#           rc = h['W'].Fill(F[n][fid]['weight'])
-#           C+=F[n][fid]['weight']
-#      rc = h['C'].Fill(C)
-#    for n in Finv:
-#      E=0
-#      for sipm in Finv[n]:
-#           E+=Finv[n][sipm]['weight']
-#      rc = h['Eff'].Fill(E)
-#      rc = h['S'].Fill(len(Finv[n]))
-
-# def test(chan):
-#     for x in F['VertMatVolume'][chan]:
-#             print('%6i:%5.2F'%(x,F['VertMatVolume'][chan][x]))
-
-# def inspectSiPM():
-# 	sGeo = ROOT.gGeoManager
-# 	SiPMmapVol = sGeo.FindVolumeFast("SiPMmapVol")
-# 	for l1 in  SiPMmapVol.GetNodes():   # 3 mats with 4 SiPMs each and 128 channels
-# 		t1 = l1.GetMatrix().GetTranslation()[1]
-# 		if l1.GetNumber()%1000==0: print( "%s  %5.2F"%(l1.GetName(),(t1)*10.))
-
-# def inspectMats():
-# 	sGeo = ROOT.gGeoManager
-# 	ScifiHorPlaneVol = sGeo.FindVolumeFast("ScifiHorPlaneVol")
-# 	for l1 in  ScifiHorPlaneVol.GetNodes():    # 3 mats
-# 		t1 = l1.GetMatrix().GetTranslation()[1]
-# 		print(l1.GetName(),t1)
-# 		for l2 in  l1.GetVolume().GetNodes():
-# 			t2 = l2.GetMatrix().GetTranslation()[1]
-# 			print("       ",l2.GetName(),t2,t1+t2)
-# def checkFibreCoverage(Finv):
-# 	for mat in range(1,4):
-# 		for row in range(1,7):
-# 			for channel in range(1,473):
-# 				fID = mat*10000+row*1000+channel
-# 				if not fID in Finv: print('missing fibre:',fID)
-# def checkLocalPosition(fibresSiPM):
-# 	ut.bookHist(h,'delta','central - weighted',100,-20.,20.)
-# 	L = localPosition(fibresSiPM)
-# 	sGeo = ROOT.gGeoManager
-# 	SiPMmapVol = sGeo.FindVolumeFast("SiPMmapVol")
-# 	for l in  SiPMmapVol.GetNodes():
-# 		n  = l.GetNumber()
-# 		ty = l.GetMatrix().GetTranslation()[1]
-# 		delta = ty-L[n]
-# 		rc = h['delta'].Fill(delta*10*1000.)
-# def moreChecks(modules):
-# 	ut.bookHist(h,'dx','dx',100,-0.1,0.1)
-# 	ut.bookHist(h,'dy','dy',100,-1.,1.)
-# 	ut.bookHist(h,'dz','dz',100,-0.2,0.2)
-# 	AS=ROOT.TVector3()
-# 	BS=ROOT.TVector3()
-# 	AF=ROOT.TVector3()
-# 	BF=ROOT.TVector3()
-# 	scifi   = modules['Scifi']
-# 	F=getFibre2SiPMCPP(modules)
-# 	for station in range(1,6):
-# 		for orientation in range(0,2):
-# 			for channel in F:
-# 				globChannel = station* 1000000+ orientation*100000 +channel
-# 				scifi.GetSiPMPosition(globChannel,AS,BS)
-# 				for fibre in F[channel]:
-# 					globFibre = station* 1000000+ orientation*100000+fibre
-# 					scifi.GetPosition(globFibre,AF,BF)
-# 					if orientation==0: 
-# 						dx = AS[1]-AF[1]
-# 						dy = AS[0]-AF[0]
-# 					else: 
-# 						dx = AS[0]-AF[0]
-# 						dy = AS[1]-AF[1]
-# 					dz = AS[2]-AF[2]
-# 					rc = h['dx'].Fill(dx)
-# 					rc = h['dy'].Fill(dy)
-# 					rc = h['dz'].Fill(dz)
-# def someDrawings(F,channel):
-#    AF = ROOT.TVector3()
-#    BF = ROOT.TVector3()
-#    ut.bookCanvas(h,'c1',' ;x;y',800,800,1,1)
-#    s = int(channel/1000000)
-#    o = int( (channel-1000000*s)/100000)
-#    locChannel = channel%100000
-#    fibreVol = sGeo.FindVolumeFast('FiberVolume')
-#    R = fibreVol.GetShape().GetDX()
-#    sipmVol = sGeo.FindVolumeFast("ChannelVol")
-#    DY = sipmVol.GetShape().GetDY()
-#    DZ = sipmVol.GetShape().GetDZ()
-#    n = 0
-#    xmin = 999.
-#    xmax = -999.
-#    ymin = 999.
-#    ymax = -999.
-#    for fibre in F[locChannel]:
-#       globFibre = int(s*1000000 + o*100000 + fibre)
-#       scifi.GetPosition(globFibre,AF,BF)
-#       loc = scifi.GetLocalPos(globFibre,AF)
-#       h['ellipse'+str(n)]=ROOT.TEllipse(loc[0],loc[2],R,0)
-#       n+=1
-#       if xmin>loc[0]: xmin = loc[0]
-#       if ymin>loc[2]: ymin = loc[2]
-#       if xmax<loc[0]: xmax = loc[0]
-#       if ymax<loc[2]: ymax = loc[2]
-#    print(xmin,xmax,ymin,ymax)
-#    D = ymax - ymin+3*R
-#    x0 = (xmax+xmin)/2.
-#    ut.bookHist(h,'x','',100,x0-D/2,x0+D/2,100,ymin-1.5*R,ymax+1.5*R)
-#    h['x'].SetStats(0)
-#    h['x'].Draw()
-#    for i in range(n):
-#       print(fibre,globFibre,loc[0],loc[1],loc[2])
-#       el = h['ellipse'+str(i)]
-#       el.SetFillColor(6)
-#       el.Draw('same')
-#    scifi.GetSiPMPosition(channel,AF,BF)
-#    loc = scifi.GetLocalPos(globFibre,AF)
-#    h['rectang']=ROOT.TBox(loc[0]-DY,loc[2]-DZ,loc[0]+DY,loc[2]+DZ)
-#    h['rectang'].SetFillColor(4)
-#    h['rectang'].SetFillStyle(3001)
-#    h['rectang'].Draw('same')

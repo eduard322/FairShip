@@ -728,6 +728,10 @@ class ShipDigiReco:
     mapping = SciFiMapping.SciFiMapping(global_variables.modules)
     mapping.make_mapping()
     self.siPMFibres_U, self.siPMFibres_V = mapping.get_siPMFibres()
+    self.fibresSiPMU, self.fibresSiPMV = mapping.get_fibresSiPM()
+    print("MTC digitization: found", len(self.siPMFibres_U), "U fibres and", len(self.siPMFibres_V), "V fibres")
+    print("MTC digitization: found", len(self.fibresSiPMU), "U SiPMs and", len(self.fibresSiPMV), "V SiPMs")
+    # exit(0)
     for k, mc_point in enumerate(self.sTree.MtcDetPoint):
       print("MTC digitization: processing point", k, "of", self.sTree.MtcDetPoint.GetEntriesFast(), "detector ID:", mc_point.GetDetectorID())
       det_id = mc_point.GetDetectorID()
@@ -763,6 +767,7 @@ class ShipDigiReco:
       loc_fibre_id = det_id % 1_000_000
       if loc_fibre_id not in fibre_map:
         # If there is no entry for this fibre ID, skip
+        print(f"MTC digitization: no mapping found for fibre ID {loc_fibre_id} in station type {station_type}. Skipping.")
         continue
 
       for sipm_chan, chan_info in fibre_map[loc_fibre_id].items():
