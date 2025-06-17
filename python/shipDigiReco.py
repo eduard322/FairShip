@@ -68,7 +68,7 @@ class ShipDigiReco:
   self.digiStraw = ROOT.std.vector("strawtubesHit")()
   self.digiStrawBranch   = self.sTree.Branch("Digi_StrawtubesHits",self.digiStraw,32000,-1)
   self.digiMTC = ROOT.std.vector("MtcDetHit")()
-  self.digiMTCBranch   = self.sTree.Branch("Digi_MTCHits",self.digiMTC,32000,-1)
+  self.digiMTCBranch   = self.sTree.Branch("Digi_MTCHits",self.digiMTC,32000,1)
   self.digiSBT    = ROOT.std.vector("vetoHit")()
   self.digiSBTBranch=self.sTree.Branch("Digi_SBTHits",self.digiSBT,32000,-1)
   self.vetoHitOnTrackArray    = ROOT.TClonesArray("vetoHitOnTrack")
