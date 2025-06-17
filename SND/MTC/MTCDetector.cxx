@@ -820,7 +820,7 @@ Bool_t MTCDetector::ProcessHits(FairVolume* vol)
                 fLength,
                 fELoss,
                 pdgCode);
-        hit->Print();
+        // hit->Print();
         ShipStack* stack = dynamic_cast<ShipStack*>(gMC->GetStack());
         stack->AddPoint(kMTC);
     }
@@ -865,7 +865,7 @@ MtcDetPoint* MTCDetector::AddHit(Int_t trackID,
 {
     TClonesArray& clref = *fMTCDetectorPointCollection;
     Int_t size = clref.GetEntriesFast();
-    cout << Form("MTCDetector::AddHit: Adding hit %d with detID %d at position (%.3f, %.3f, %.3f) with momentum (%.3f, %.3f, %.3f), time %.3f, length %.3f, eLoss %.3f, pdgCode %d",
-        size, detID, pos.X(), pos.Y(), pos.Z(), mom.Px(), mom.Py(), mom.Pz(), time, length, eLoss * 1.0e6, pdgCode);
+    // cout << Form("MTCDetector::AddHit: Adding hit %d with detID %d at position (%.3f, %.3f, %.3f) with momentum (%.3f, %.3f, %.3f), time %.3f, length %.3f, eLoss %.3f, pdgCode %d",
+    //     size, detID, pos.X(), pos.Y(), pos.Z(), mom.Px(), mom.Py(), mom.Pz(), time, length, eLoss * 1.0e6, pdgCode);
     return new (clref[size]) MtcDetPoint(trackID, detID, pos, mom, time, length, eLoss, pdgCode);
 }

@@ -40,9 +40,9 @@ MtcDetHit::MtcDetHit(int SiPMChan,
     constexpr Float_t kTimeRes      = 150e-3f;  // 150 ps
     constexpr Float_t kSignalSpeed  = 15.0f;    // cm/ns
     const Float_t  invSignalSpeed   = 1.0f / kSignalSpeed;
-
+    fDetectorID = SiPMChan; // Set the detector ID
     // Determine plane type once
-    const int plane_type = (SiPMChan / 100000) % 10;
+    const int plane_type = GetStationType();
 
     Float_t totalLy     = 0.0f;
     Float_t earliestToA = std::numeric_limits<Float_t>::max();
@@ -56,7 +56,7 @@ MtcDetHit::MtcDetHit(int SiPMChan,
         }
         flag = true;
         signals = signalSum;
-        std::cout << Form("MtcDetHit: Scintillating mat, SiPM %d, total signal %.2f keV", 
+        std::cout << Form("MtcDetHit: Scintillating mat, SiPM %d, total signal %.2f keV",
                          SiPMChan, signalSum*1e6) << std::endl;
         return;
     }
@@ -88,7 +88,7 @@ MtcDetHit::MtcDetHit(int SiPMChan,
         earliestToA = std::min(earliestToA, arrival);
 
         // Debug print per point (optional, can be gated behind verbose flag)
-        // std::cout << Form("Hit: SiPM %d, Fibre %d, dist %.2f cm, eLoss %.2f keV, ly %.2f p.e., pdg %d", 
+        // std::cout << Form("Hit: SiPM %d, Fibre %d, dist %.2f cm, eLoss %.2f keV, ly %.2f p.e., pdg %d",
         //                  SiPMChan, pt->GetDetectorID(), distance, energy*1e6f, ly, pt->PdgCode()) << std::endl;
     }
 
@@ -106,81 +106,6 @@ MtcDetHit::MtcDetHit(int SiPMChan,
                      SiPMChan, smearedLy, pix, signals, time) << std::endl;
 }
 
-/*
- * Optimizations Applied:
- * 1. Cached MTCDetector lookup (only once, static) to avoid repeated dynamic_cast.
- * 2. Moved constant values into constexpr for compile-time evaluation.
- * 3. Precomputed inverse signal speed to replace division with multiplication.
- * 4. Separated code paths for scintillating mat (plane_type == 2) and fibers to avoid conditionals in the loop.
- * 5. Used ranged indexing and local references to minimize repeated vector access.
- * 6. Removed per-point debug prints (commented out) to reduce I/O overhead; can be enabled via a verbose flag.
- * 7. Minimized temporary object creation (e.g., sipm positions fetched once).
- * 8. Used std::min for earliest time calculation.
- * 9. Combined loops and eliminated redundant calculations.
- */
-
-
-
-// // -----   constructor from point class  ------------------------------------------
-// MtcDetHit::MtcDetHit (int SiPMChan, std::vector<MtcDetPoint*> V, std::vector<Float_t> W)
-// {
-//      MTCDetector* MTCDet = dynamic_cast<MTCDetector*> (gROOT->GetListOfGlobals()->FindObject("MTC") );
-//      Float_t nphe_min = 3.5;
-//      Float_t nphe_max = 104.;
-//      Float_t timeResol = 150.*0.001; // in picoseconds
-//      Float_t signalSpeed = 15; // in cm/ns, speed of light in scintillating fibers
-//     //  fDetectorID  = SiPMChan;
-//      Float_t ly_total = 0;
-//      Float_t earliestToA   = 1E20;
-//      Int_t plane_type = int(SiPMChan/100000)%10; // 0 - U, 1 - V
-//      for( int i = 0; i <V.size();i++) {
-
-//         if(plane_type == 2){
-//           signals += V[i]->GetEnergyLoss(); // signal from Scintillating mat
-//           std::cout << Form("MtcDetHit: Scintillating mat, SiPM %d, signal %.2f keV, particle: %d", SiPMChan, signals*1e6, V[i]->PdgCode()) << std::endl;
-//         }
-//         else{
-
-//           Double_t signal = V[i]->GetEnergyLoss()*W[i];
-//     // Find distances from MCPoint centre to ends of fibre
-//           TVector3 a, b;
-//           TVector3 impact(V[i]->GetX(),V[i]->GetY() ,V[i]->GetZ() );
-//           MTCDet->GetSiPMPosition(SiPMChan, a, b);
-//           Double_t distance;
-//           // Calculate distance from energy deposit to SiPM.
-//           distance = (b - impact).Mag();
-//           // convert energy deposit to light yield (here Np.e. == avg. N fired pixels)
-//           Float_t ly = signal*1E+6*0.16; //0.16 p.e per 1 keV
-//           // account for the light attenuation in the fibers
-//           std::cout << Form("MtcDetHit: SiPM %d, Fibre: %d, distance %.2f cm, signal %.2f keV, light yield %.2f p.e., particle: %d", SiPMChan, V[i]->GetDetectorID(), distance, signal*1e6, ly, V[i]->PdgCode()) << std::endl;
-//           ly*= ly_loss(distance);
-//           ly_total+= ly;
-
-//           // for the timing, find earliest light to arrive at SiPM and smear with time resolution
-//           Float_t arrival_time = V[i]->GetTime() + distance/signalSpeed;
-//           if (arrival_time < earliestToA){earliestToA = arrival_time;}
-//           }
-//     }
-//      time = gRandom->Gaus(earliestToA, timeResol);
-//      if(plane_type == 2){
-//           flag=true;
-//           std::cout << Form("MtcDetHit: Scintillating mat, SiPM %d, total signal %.2f MeV", SiPMChan, signals) << std::endl;
-//      }
-//      else{
-//           // smear the total light yield using Poisson distribution
-//           ly_total = gRandom->Poisson(ly_total);
-//           // account for limited SiPM dyn. range
-//           Float_t Npix = sipm_saturation(ly_total, nphe_max);
-//           // convert Npix to QDC
-//           signals = npix_to_qdc(Npix);
-//           if (ly_total > nphe_min){   // nominal threshold at 3.5 p.e.
-//             flag=true;
-//           }else{
-//             flag=false;
-//           }
-//           std::cout << Form("MtcDetHit: SiPM %d, total light yield %.2f p.e., Npix %.2f, signal %.2f, time %.3f ns \n", SiPMChan, ly_total, Npix, signals, time);
-//      }
-// }
 
 // -----   Destructor   ----------------------------------------------------
 MtcDetHit::~MtcDetHit() { }
@@ -214,7 +139,8 @@ Float_t MtcDetHit::npix_to_qdc(Float_t npix){
 // -----   Public method Print   -------------------------------------------
 void MtcDetHit::Print()
 {
-  std::cout << "-I- MtcDetHit: Scifi hit " << " in station " << std::endl;
+  std::cout << Form("MtcDetHit: Detector ID %d, Layer %d, Station Type %d, SiPM %d, Channel %d, Signal %.2f, Time %.3f",
+                   fDetectorID, GetLayer(), GetStationType(), GetSiPM(), GetSiPMChan(), signals, time);
 }
 // -------------------------------------------------------------------------
 

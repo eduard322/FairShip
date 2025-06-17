@@ -68,7 +68,7 @@ class ShipDigiReco:
   self.digiStraw = ROOT.std.vector("strawtubesHit")()
   self.digiStrawBranch   = self.sTree.Branch("Digi_StrawtubesHits",self.digiStraw,32000,-1)
   self.digiMTC = ROOT.std.vector("MtcDetHit")()
-  self.digiMTCBranch   = self.sTree.Branch("Digi_MTCHits",self.digiStraw,32000,-1)
+  self.digiMTCBranch   = self.sTree.Branch("Digi_MTCHits",self.digiMTC,32000,-1)
   self.digiSBT    = ROOT.std.vector("vetoHit")()
   self.digiSBTBranch=self.sTree.Branch("Digi_SBTHits",self.digiSBT,32000,-1)
   self.vetoHitOnTrackArray    = ROOT.TClonesArray("vetoHitOnTrack")
@@ -91,6 +91,17 @@ class ShipDigiReco:
    self.recoSplitcal = ROOT.TClonesArray("splitcalCluster")
    self.recoSplitcalBranch=self.sTree.Branch("Reco_SplitcalClusters",self.recoSplitcal,32000,-1)
 
+
+  # add MTC module to the list of globals to use it later in the MTCDetHit class. Consistent with SND@LHC approach.
+  lsOfGlobals = ROOT.gROOT.GetListOfGlobals()
+  if global_variables.modules["MTC"] not in lsOfGlobals:
+    lsOfGlobals.Add(global_variables.modules["MTC"])
+  # make SiPM to fibre mapping
+  if self.sTree.GetBranch("MtcDetPoint"):
+    mapping = SciFiMapping.SciFiMapping(global_variables.modules)
+    mapping.make_mapping()
+    self.siPMFibres_U, self.siPMFibres_V = mapping.get_siPMFibres()
+    self.fibresSiPMU, self.fibresSiPMV = mapping.get_fibresSiPM()
 # setup ecal reconstruction
   self.caloTasks = []
   if self.sTree.GetBranch("EcalPoint") and not self.sTree.GetBranch("splitcalPoint"):
@@ -718,17 +729,9 @@ class ShipDigiReco:
       - 4: SiPM number (0-N, where N is the number of SiPMs in the station)
       - 123: number of the SiPM channel (0-127, 128 channels per SiPM)
     """
-    # add MTC module to the list of globals to use it later in the MTCDetHit class. Consistent with SND@LHC approach.
-    lsOfGlobals = ROOT.gROOT.GetListOfGlobals()
-    lsOfGlobals.Add(global_variables.modules["MTC"])
     hit_container = {}
     mc_points = {}
     norm = {}
-    # make SiPM to fibre mapping
-    mapping = SciFiMapping.SciFiMapping(global_variables.modules)
-    mapping.make_mapping()
-    self.siPMFibres_U, self.siPMFibres_V = mapping.get_siPMFibres()
-    self.fibresSiPMU, self.fibresSiPMV = mapping.get_fibresSiPM()
     print("MTC digitization: found", len(self.siPMFibres_U), "U fibres and", len(self.siPMFibres_V), "V fibres")
     print("MTC digitization: found", len(self.fibresSiPMU), "U SiPMs and", len(self.fibresSiPMV), "V SiPMs")
     # exit(0)
@@ -797,7 +800,7 @@ class ShipDigiReco:
     # digi2MCPoints will be added later
     #   for idx, de_value in mc_points[det_id].items():
     #     mc_links.Add(det_id, idx, de_value / norm[det_id])
-
+    print("Container size after MTC digitization:", self.digiMTC.size())
 
 
 
