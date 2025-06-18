@@ -56,8 +56,6 @@ MtcDetHit::MtcDetHit(int SiPMChan,
         }
         flag = true;
         signals = signalSum;
-        std::cout << Form("MtcDetHit: Scintillating mat, SiPM %d, total signal %.2f keV",
-                         SiPMChan, signalSum*1e6) << std::endl;
         return;
     }
 
@@ -101,9 +99,6 @@ MtcDetHit::MtcDetHit(int SiPMChan,
     hitFlag = (smearedLy > kNpheMin);
     flag    = hitFlag;
     time    = gRandom->Gaus(earliestToA, kTimeRes);
-
-    std::cout << Form("MtcDetHit: SiPM %d, total ly %d p.e., pix %.2f, qdc %.2f, time %.3f ns",
-                     SiPMChan, smearedLy, pix, signals, time) << std::endl;
 }
 
 

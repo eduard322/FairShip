@@ -37,23 +37,11 @@ class MtcDetPoint : public FairMCPoint
     /** Output to screen **/
     virtual void Print() const;
     Int_t PdgCode() const { return fPdgCode; }
-    // Float_t GetEnergyLoss() const { return fEnergyLoss; }
-    // Float_t GetX() const { return fX; }
-    // Float_t GetY() const { return fY; }
-    // Float_t GetZ() const { return fZ; }
-    // Float_t GetTime() const { return fTime; }
-    // Int_t GetDetectorID() const { return fDetectorID; }
     Int_t GetStationType() const { return int(fDetectorID / 100000) % 10; }
     Int_t GetLayer();
     Int_t GetLayerType();
-    // /** Copy constructor **/
     Int_t fPdgCode;
-    // Float_t fEnergyLoss; // Energy loss in keV
-    // Float_t fX;         // X position in cm
-    // Float_t fY;         // Y position in cm
-    // Float_t fZ;         // Z position in cm
-    // Float_t fTime;      // Time in ns
-    // Int_t fDetectorID;  // Detector ID
+
 
     MtcDetPoint(const MtcDetPoint& point);
     MtcDetPoint operator=(const MtcDetPoint& point);

@@ -120,8 +120,6 @@ void MTCDetector::SetMTCParameters(Double_t w,
     fZCenter = z;
     fFieldY = field;
     fSciFiActiveX  = fWidth - fWidth * tan(fSciFiBendingAngle * TMath::DegToRad());
-    cout << Form("MTC parameters set: Width=%.2f, Height=%.2f, SciFi Angle=%.2f, Iron Thickness=%.2f, SciFi Thickness=%.2f, Scint Thickness=%.2f, Layers=%d, Z Center=%.2f, Field Y=%.2f",
-           fWidth, fHeight, fSciFiBendingAngle, fIronThick, fSciFiThick, fScintThick, fLayers, fZCenter, fFieldY) << endl;
 }
 
 
@@ -139,7 +137,6 @@ void MTCDetector::CreateScintModule(const char* name,
                                               Double_t transparency,
                                               Int_t LayerId)
 {
-    // auto motherVol = new TGeoVolumeAssembly(Form("%s_mother", name));
     modMotherVol->SetLineColor(color);
     modMotherVol->SetTransparency(transparency);
     auto scint_volume = new TGeoVolumeAssembly(Form("%s_scint", name));
@@ -185,10 +182,6 @@ void MTCDetector::CreateSciFiModule(const char* name,
     Double_t zUpperIronInt = 3.2 / 10;
     // Total module thickness = 0.3 + 0.135 + 0.1 + 0.135 + 0.3 ≈ 1.0 cm
 
-    // --- Module mother in Air ---
-    // TGeoVolumeAssembly* modMotherVol = new TGeoVolumeAssembly(Form("%s_mother", name));
-    // modMotherVol->SetLineColor(kGreen+2);
-    // modMotherVol->SetTransparency(40);
 
     // --- Lower Internal Iron ---
     TGeoBBox* lowerIronBox = new TGeoBBox(Form("%s_lowerIron", name),
@@ -283,7 +276,6 @@ void MTCDetector::CreateSciFiModule(const char* name,
             TGeoCombiTrans* ct = new TGeoCombiTrans("", x0, 0, z0, rotU);
             Int_t copyNo = 100000000 + 1000000 + 0 * 100000 + layer * 10000 + j;
             ScifiMatVolU->AddNode(fiberVol, copyNo, ct);
-            // cout << Form("Place fiber %d U layer=%d idx=%d", copyNo, layer, j) << endl;
         }
     }
 
@@ -298,9 +290,126 @@ void MTCDetector::CreateSciFiModule(const char* name,
             TGeoCombiTrans* ct = new TGeoCombiTrans("", x0, 0, z0, rotV);
             Int_t copyNo = 100000000 + 1000000 + 1 * 100000 + layer * 10000 + j;
             ScifiMatVolV->AddNode(fiberVol, copyNo, ct);
-            // cout << Form("Place fiber %d V layer=%d idx=%d", copyNo, layer, j) << endl;
         }
     }
+}
+
+void MTCDetector::ConstructGeometry()
+{
+    // Initialize media (using FairROOT’s interface)
+    InitMedium("SciFiMat");
+    TGeoMedium* SciFiMat = gGeoManager->GetMedium("SciFiMat");
+    InitMedium("Epoxy");
+    TGeoMedium* Epoxy = gGeoManager->GetMedium("Epoxy");
+    InitMedium("air");
+    TGeoMedium* air = gGeoManager->GetMedium("air");
+    TGeoMedium* ironMed = gGeoManager->GetMedium("iron");
+    // For the scintillator, you may use the same medium as SciFiMat or another if defined.
+    TGeoMedium* scintMed = gGeoManager->GetMedium("SciFiMat");
+    InitMedium("silicon");
+
+
+    // Define the module spacing based on three sublayers:
+    //   fIronThick (outer iron), fSciFiThick (SciFi module/fiber module), fScintThick (scintillator)
+    Double_t moduleSpacing = fIronThick + fSciFiThick + fScintThick;
+    Double_t totalLength = fLayers * moduleSpacing;
+
+    // --- Create an envelope volume for the detector (green, semi-transparent) ---
+    auto envBox = new TGeoBBox("MTC_env", fWidth / 2, fHeight / 2, totalLength / 2);
+    auto envVol = new TGeoVolume("MTC", envBox, air);
+    envVol->SetLineColor(kGreen);
+    envVol->SetTransparency(50);
+
+    // --- Outer Iron Layer (gray) ---
+    auto ironBox = new TGeoBBox("MTC_iron", fWidth / 2, fHeight / 2, fIronThick / 2);
+    auto ironVol = new TGeoVolume("MTC_iron", ironBox, ironMed);
+    ironVol->SetLineColor(kGray + 1);
+    ironVol->SetTransparency(20);
+    // Enable the field in the iron volume
+    if (fFieldY != 0) ironVol->SetField(new TGeoUniformMagField(0, fFieldY, 0));
+
+    // --- Assemble the layers into the envelope ---
+    TGeoVolumeAssembly* sensitiveModule = new TGeoVolumeAssembly("MTC_layer");
+    // Define a layer for the SciFi module
+    CreateSciFiModule("MTC", sensitiveModule, fWidth, fHeight, fSciFiThick, 1);
+    CreateScintModule("MTC", sensitiveModule, fSciFiThick / 2 + fScintThick / 2, fWidth, fHeight, fScintThick, 1.0, 1.0, scintMed, kAzure + 7, 30, 1);
+
+    for (Int_t i = 0; i < fLayers; i++) {
+        // Compute the center position (z) for the current module
+        Double_t zPos = -totalLength / 2 + i * moduleSpacing;
+
+        // Place the Outer Iron layer (shifted down by half the SciFi+scint thickness)
+        envVol->AddNode(ironVol, i, new TGeoTranslation(0, 0, zPos + fIronThick / 2));
+        // Place the sensitive module (SciFi + Scintillator) at the correct z position
+        envVol->AddNode(sensitiveModule, i, new TGeoTranslation(0, 0, zPos + fIronThick + fSciFiThick / 2));
+    }
+
+    // Finally, add the envelope to the top volume with the global z offset fZCenter
+    gGeoManager->GetTopVolume()->AddNode(envVol, 1, new TGeoTranslation(0, 0, fZCenter));
+}
+// Standard FairDetector methods
+void MTCDetector::Initialize()
+{
+    FairDetector::Initialize();
+}
+
+Bool_t MTCDetector::ProcessHits(FairVolume* vol)
+{
+    /** This method is called from the MC stepping */
+    // Set parameters at entrance of volume. Reset ELoss.
+    if (gMC->IsTrackEntering()) {
+        fELoss = 0.;
+        fTime = gMC->TrackTime() * 1.0e09;
+        fLength = gMC->TrackLength();
+        gMC->TrackPosition(fPos);
+        gMC->TrackMomentum(fMom);
+        TGeoNavigator* nav = gGeoManager->GetCurrentNavigator();
+        Int_t vol_local_id = nav->GetCurrentNode()->GetNumber() % 1000000; // Local ID within the mat or scint.
+		Int_t layer_id = nav->GetMother(3)->GetNumber(); // Get layer ID.
+        fVolumeID = 100000000 + layer_id * 1000000 + vol_local_id; // 1e8 + layer_id * 1e6 + fibre_local_id;
+    }
+    // Sum energy loss for all steps in the active volume
+    fELoss += gMC->Edep();
+
+    // Create vetoPoint when exiting active volume
+    if (gMC->IsTrackExiting() || gMC->IsTrackStop() || gMC->IsTrackDisappeared()) {
+
+        if (fELoss == 0.) {
+            return kFALSE;
+        }   // if you do not want hits with zero eloss
+
+        TParticle* p = gMC->GetStack()->GetCurrentTrack();
+        fTrackID = gMC->GetStack()->GetCurrentTrackNumber();
+        Int_t pdgCode = p->GetPdgCode();
+        TLorentzVector Pos;
+        gMC->TrackPosition(Pos);
+        TLorentzVector Mom;
+        gMC->TrackMomentum(Mom);
+        Double_t x, y, z;
+        if (fVolumeID / 100000 == 3) {
+            x = (fPos.X() + Pos.X()) / 2.;
+            y = (fPos.Y() + Pos.Y()) / 2.;
+            z = (fPos.Z() + Pos.Z()) / 2.;
+            }
+            else {
+            x = fPos.X();
+            y = fPos.Y();
+            z = (fPos.Z() + Pos.Z()) / 2.;
+            }
+
+        auto hit = AddHit(fTrackID,
+                fVolumeID,
+                TVector3(x, y, z),
+                TVector3(fMom.Px(), fMom.Py(), fMom.Pz()),   // entrance momentum
+                fTime,
+                fLength,
+                fELoss,
+                pdgCode);
+        // hit->Print();
+        ShipStack* stack = dynamic_cast<ShipStack*>(gMC->GetStack());
+        stack->AddPoint(kMTC);
+    }
+    return kTRUE;
 }
 
 
@@ -311,24 +420,20 @@ void MTCDetector::SiPMOverlap()
 	Double_t fWidthChannel = 0.025*2;
 	Int_t fNSiPMChan = 128;
 	Int_t fNSiPMs  = 7;
-    // fSciFiActiveX / (fNSiPMChan * fWidthChannel);
 	Int_t fNMats   = 1;
 	Double_t fEdge = 0.413 - 0.025 / 2;
     Double_t initial_shift = fFiberLength*sin(fSciFiBendingAngle*TMath::DegToRad()) / 2;
 	Double_t fCharr = 64 * fWidthChannel;
 	Double_t firstChannelX = -fSciFiActiveX/2;
-    cout << Form("fSciFiActiveX=%.3f, fCharr=%.3f, firstChannelX=%.3f, initial_shift=%.3f", fSciFiActiveX, fCharr, firstChannelX, initial_shift) << endl;
 
     //Contains all plane SiPMs, defined for horizontal fiber plane
     //To obtain SiPM map for vertical fiber plane rotate by 90 degrees around Z
     TGeoVolumeAssembly *SiPMmapVolU = new TGeoVolumeAssembly("SiPMmapVolU");
     TGeoVolumeAssembly *SiPMmapVolV = new TGeoVolumeAssembly("SiPMmapVolV");
 
-    // TGeoVolume*ChannelVol = gGeoManager->MakeBox("ChannelVol", 0, fWidthChannel/2, fLengthScifiMat/2, fiberMatThick/2);
     TGeoBBox* ChannelVol_box = new TGeoBBox("ChannelVol",
                                         fWidthChannel/2, fLengthScifiMat/2, fiberMatThick/2);
     TGeoVolume* ChannelVol = new TGeoVolume("ChannelVol", ChannelVol_box, gGeoManager->GetMedium("silicon"));
-    // auto ChannelVol = gGeoManager->MakeBox("ChannelVol", 0, fWidthChannel/2, fLengthScifiMat/2, fiberMatThick/2);
   /*
     Example of fiberID: 123051820, where:
       - 1: MTC unique ID
@@ -355,13 +460,10 @@ void MTCDetector::SiPMOverlap()
             SiPMmapVolU->AddNode(ChannelVol, 100000*0 + imat*10000+isipms *1000 + ichannel, new TGeoTranslation(pos, 0, 0));
             // -5 degrees
             SiPMmapVolV->AddNode(ChannelVol, 100000*1 + imat*10000+isipms *1000 + ichannel, new TGeoTranslation(-pos, 0, 0));
-            // cout << Form("Adding SiPM channel %d at position %.3f", imat*10000+isipms *1000 + ichannel, pos) << endl;
             pos += fWidthChannel;
 
         }
-        // pos+=fEdge+fBigGap;
     }
-    // pos+= fEdge;
    }
 
 }
@@ -392,7 +494,7 @@ void MTCDetector::GetPosition(Int_t fDetectorID, TVector3& A, TVector3& B)
 	TString sID, stationID;
 	sID.Form("%i",fDetectorID);
     stationID.Form("%i", station_number);
-    // /cave/MTC_1/MTC_layer_1/MTC_sciFi_mother_1/MTC_sciFi_epoxyMat_U_1/FiberVol_101010187
+    // Basic hierarchy: /cave/MTC_1/MTC_layer_1/MTC_sciFi_mother_1/MTC_sciFi_epoxyMat_U_1/FiberVol_101010187
     TString path;
     if (plane_type == 0) {
         path = "/cave/MTC_1/MTC_layer_" + stationID + "/MTC_scifi_U_0" + "/MTC_epoxyMat_0" + "/FiberVol_1010";
@@ -424,7 +526,7 @@ TVector3 MTCDetector::GetLocalPos(Int_t fDetectorID, TVector3* glob){
 	TString sID, stationID;
 	sID.Form("%i",fDetectorID);
     stationID.Form("%i", station_number);
-    // /cave/MTC_1/MTC_layer_1/MTC_sciFi_mother_1/MTC_sciFi_epoxyMat_U_1/FiberVol_101010187
+    // Basic hierarchy: /cave/MTC_1/MTC_layer_1/MTC_sciFi_mother_1/MTC_sciFi_epoxyMat_U_1/FiberVol_101010187
     TString path;
     if (plane_type == 0) {
         path = "/cave/MTC_1/MTC_layer_" + stationID + "/MTC_scifi_U_0";
@@ -471,12 +573,9 @@ void MTCDetector::GetSiPMPosition(Int_t SiPMChan, TVector3& A, TVector3& B)
 	Double_t loc[3] = {0,0,0};
     TString path;
     if (plane_type == 0) {
-        // MTC_epoxyMat_0
         path = "/cave/MTC_1/MTC_layer_" + stationID + "/MTC_scifi_U_0" + "/MTC_epoxyMat_0";
-        // path = "/cave/MTC_1/MTC_layer_1" + "/MTC_scifi_U_0" + "/MTC_epoxyMat_0";
     } else {
         path = "/cave/MTC_1/MTC_layer_" + stationID + "/MTC_scifi_V_0" + "/MTC_epoxyMat_0";
-        // path = "/cave/MTC_1/MTC_layer_1" + "/MTC_scifi_V_0" + "/MTC_epoxyMat_0";
     }
 	TGeoNavigator* nav = gGeoManager->GetCurrentNavigator();
 	Double_t glob[3] = {0,0,0};
@@ -488,7 +587,7 @@ void MTCDetector::GetSiPMPosition(Int_t SiPMChan, TVector3& A, TVector3& B)
     A.SetXYZ( glob[0], glob[1],glob[2] );
     loc[0] = locPosition;
     loc[1] = fFiberLength/2;
-    loc[2] = 7.47;
+    loc[2] = 7.47; // hardcoded for now, for some reason required to get the correct local position
     nav->LocalToMaster(loc, glob);
     B.SetXYZ( glob[0], glob[1],glob[2] );
 }
@@ -545,8 +644,7 @@ void MTCDetector::SiPMmapping(){
 	Float_t dSiPM = -1;
 	TGeoNode* vol;
 	TGeoNode* fibre;
-    cout << "!!!!!!!! Processing MTC plane " << endl;
-	SiPMOverlap();           // 12 SiPMs per mat, made for horizontal mats, fibres staggered along y-axis.
+	SiPMOverlap();
     // Loop over both U and V planes
     std::vector<std::pair<const char*, const char*>> sipm_planes = {
         {"SiPMmapVolU", "MTC_scifi_U"},
@@ -559,8 +657,6 @@ void MTCDetector::SiPMmapping(){
         auto plane = gGeoManager->FindVolumeFast(pair.second);
         if (!plane) continue;
         for (int imat = 0; imat < plane->GetNodes()->GetEntries(); imat++) {
-            // original code continues here
-        // cout << "!!!!!!!! Processing material " << imat << " in MTC plane";
 		auto mat =  static_cast<TGeoNode*>(plane->GetNodes()->At(imat));
 		Float_t t1 = mat->GetMatrix()->GetTranslation()[0];
 		auto vmat = mat->GetVolume();
@@ -571,47 +667,36 @@ void MTCDetector::SiPMmapping(){
 				auto S = dynamic_cast<TGeoBBox*>(tmp);
 				fibresRadius = S->GetDX();
 			}
-			Float_t t2 = fibre->GetMatrix()->GetTranslation()[0];
-			Int_t fID = fibre->GetNumber()%100000 + imat*1e4;     // local fibre number, global fibre number = SO+fID
-            // Int_t fID = fibre->GetNumber();
-			// Float_t a = t1+t2;
+			Int_t fID = fibre->GetNumber()%1000000 + imat*1e4;     // local fibre number, global fibre number = SO+fID
             TVector3 Atop, Bbot;
             GetPosition(fibre->GetNumber(), Atop, Bbot);
             Float_t a = Atop[0];
-            cout << Form("Processing fibre %d, fiberlength*sin5/2=%.3f, t2=%.3f, A_x=%.3f, a=%.3f, A_x-a=%.3f, fibresRadius=%.3f", fID, 25*tan(5*TMath::DegToRad()), t2, Atop[0], a, Atop[0] - a,  fibresRadius) << endl;
+
 
 	//  check for overlap with any of the SiPM channels in the same mat
 			for(Int_t nChan = 0; nChan< Nodes->GetEntriesFast();nChan++){        // 7 SiPMs total times 128 channels
 				vol = static_cast<TGeoNode*>(Nodes->At(nChan));
-				// Int_t N = vol->GetNumber()%100000;
                 Int_t N = vol->GetNumber();
-				// if (imat!=int(N/10000)){continue;}
 				Float_t xcentre = vol->GetMatrix()->GetTranslation()[0];
 				if  (dSiPM<0){
 					TGeoBBox* B = dynamic_cast<TGeoBBox*>(vol->GetVolume()->GetShape());
 					dSiPM = B->GetDX();
 				}
-                // cout << Form("Checking SiPM %d in mat %d, xcentre=%.3f, a=%.3f, dSiPM=%.3f", N, imat, xcentre, a, dSiPM) << endl;
 				if (TMath::Abs(xcentre-a)>4*fibresRadius){ continue;} // no need to check further
-                // cout << Form("!! SiPM %d, fibre %d, dSiPM=%.3f, a=%.3f", N, fID, dSiPM, a) << endl;
 				Float_t W = area(a,fibresRadius,xcentre-dSiPM,xcentre+dSiPM);
 				if (W<0){ continue;}
 				std::array<float, 2> Wa;
 				Wa[0] = W;
 				Wa[1] = a;
-				// fibresSiPM[N][fID] = Wa;
                 if(pair.first == std::string("SiPMmapVolU")) {
                     fibresSiPM_U[N][fID] = Wa;
-                    cout << Form("!! U: SiPM %d, fibre %d, W=%.3f, [xcentre - dSiPM=%.3f, xcentre + dSiPM=%.3f], a=%.3f", N, fID, W, xcentre-dSiPM,xcentre+dSiPM, a) << endl;
                 }
                 else {
                     fibresSiPM_V[N][fID] = Wa;
-                    cout << Form("!! V: SiPM %d, fibre %d, W=%.3f, [xcentre - dSiPM=%.3f, xcentre + dSiPM=%.3f], a=%.3f", N, fID, W, xcentre-dSiPM,xcentre+dSiPM, a) << endl;
                 }
 			}
 		}
 	}
-    cout << Form("Check the size of fibresSiPM_: %d", fibresSiPM_U.size()) << endl;
     // calculate also local SiPM positions based on fibre positions and their fraction
     // probably an overkill, maximum difference between weighted average and central position < 6 micron.
     if (pair.first == std::string("SiPMmapVolU")) {
@@ -633,7 +718,6 @@ void MTCDetector::SiPMmapping(){
             for (itx = it->second.begin(); itx != it->second.end(); itx++) {
                 Int_t nfibre = itx->first;
                 siPMFibres_U[nfibre][N] = itx->second;
-                // cout << Form("!!!! U: SiPM %d, fibre %d, W=%.3f, a=%.3f", N, nfibre, (itx->second)[0], (itx->second)[1]) << endl;
             }
         }
     } else if (pair.first == std::string("SiPMmapVolV")) {
@@ -655,177 +739,12 @@ void MTCDetector::SiPMmapping(){
             for (itx = it->second.begin(); itx != it->second.end(); itx++) {
                 Int_t nfibre = itx->first;
                 siPMFibres_V[nfibre][N] = itx->second;
-                // cout << Form("!!!! V: SiPM %d, fibre %d, W=%.3f, a=%.3f", N, nfibre, (itx->second)[0], (itx->second)[1]) << endl;
             }
         }
     }
     }
 }
 
-
-
-
-void MTCDetector::ConstructGeometry()
-{
-    // Initialize media (using FairROOT’s interface)
-    InitMedium("SciFiMat");
-    TGeoMedium* SciFiMat = gGeoManager->GetMedium("SciFiMat");
-    InitMedium("Epoxy");
-    TGeoMedium* Epoxy = gGeoManager->GetMedium("Epoxy");
-    InitMedium("air");
-    TGeoMedium* air = gGeoManager->GetMedium("air");
-    TGeoMedium* ironMed = gGeoManager->GetMedium("iron");
-    // For the scintillator, you may use the same medium as SciFiMat or another if defined.
-    TGeoMedium* scintMed = gGeoManager->GetMedium("SciFiMat");
-    InitMedium("silicon");
-
-
-    // Define the module spacing based on three sublayers:
-    //   fIronThick (outer iron), fSciFiThick (SciFi module/fiber module), fScintThick (scintillator)
-    Double_t moduleSpacing = fIronThick + fSciFiThick + fScintThick;
-    Double_t totalLength = fLayers * moduleSpacing;
-
-    // --- Create an envelope volume for the detector (green, semi-transparent) ---
-    auto envBox = new TGeoBBox("MTC_env", fWidth / 2, fHeight / 2, totalLength / 2);
-    auto envVol = new TGeoVolume("MTC", envBox, air);
-    envVol->SetLineColor(kGreen);
-    envVol->SetTransparency(50);
-
-    // --- Outer Iron Layer (gray) ---
-    auto ironBox = new TGeoBBox("MTC_iron", fWidth / 2, fHeight / 2, fIronThick / 2);
-    auto ironVol = new TGeoVolume("MTC_iron", ironBox, ironMed);
-    ironVol->SetLineColor(kGray + 1);
-    ironVol->SetTransparency(20);
-    // Enable the field in the iron volume
-    if (fFieldY != 0) ironVol->SetField(new TGeoUniformMagField(0, fFieldY, 0));
-
-    // --- Assemble the layers into the envelope ---
-    TGeoVolumeAssembly* sensitiveModule = new TGeoVolumeAssembly("MTC_layer");
-    // Define a layer for the SciFi module
-    CreateSciFiModule("MTC", sensitiveModule, fWidth, fHeight, fSciFiThick, 1);
-    CreateScintModule("MTC", sensitiveModule, fSciFiThick / 2 + fScintThick / 2, fWidth, fHeight, fScintThick, 1.0, 1.0, scintMed, kAzure + 7, 30, 1);
-
-    // sensitiveModule->AddNode(sciFiModuleVol, 1, new TGeoTranslation(0, 0, 0));
-    // sensitiveModule->AddNode(scintVol, 2, new TGeoTranslation(0, 0, 0));
-    for (Int_t i = 0; i < fLayers; i++) {
-        // Compute the center position (z) for the current module
-        Double_t zPos = -totalLength / 2 + i * moduleSpacing;
-
-        // Place the Outer Iron layer (shifted down by half the SciFi+scint thickness)
-        envVol->AddNode(ironVol, i, new TGeoTranslation(0, 0, zPos + fIronThick / 2));
-        // Create a SciFi module with the current detector id 'i'
-        // TGeoVolume* sciFiModuleVol = CreateSciFiModule("MTC_sciFi", fWidth, fHeight, fSciFiThick, i);
-        // Double_t scifi_layer_num = 1000000000 + i*10000000;
-        // envVol->AddNode(sciFiModuleVol, scifi_layer_num, new TGeoTranslation(0, 0, zPos + fIronThick + fSciFiThick / 2));
-        // TGeoVolume* scintVol =
-        //     CreateScintModule("MTC_scint", fWidth, fHeight, fScintThick, 1.0, 1.0, scintMed, kAzure + 7, 30, i);
-        // Place the Scintillator layer (shifted up by half the iron thickness)
-        // Double_t scint_layer_num = 2000000000 + i*10000000;
-
-        // envVol->AddNode(scintVol, i, new TGeoTranslation(0, 0, zPos + fIronThick + fSciFiThick + fScintThick / 2));
-        envVol->AddNode(sensitiveModule, i, new TGeoTranslation(0, 0, zPos + fIronThick + fSciFiThick / 2));
-    }
-
-    // Finally, add the envelope to the top volume with the global z offset fZCenter
-    gGeoManager->GetTopVolume()->AddNode(envVol, 1, new TGeoTranslation(0, 0, fZCenter));
-}
-// Standard FairDetector methods
-void MTCDetector::Initialize()
-{
-    FairDetector::Initialize();
-}
-
-Bool_t MTCDetector::ProcessHits(FairVolume* vol)
-{
-    /** This method is called from the MC stepping */
-    // Set parameters at entrance of volume. Reset ELoss.
-    if (gMC->IsTrackEntering()) {
-        fELoss = 0.;
-        fTime = gMC->TrackTime() * 1.0e09;
-        fLength = gMC->TrackLength();
-        gMC->TrackPosition(fPos);
-        gMC->TrackMomentum(fMom);
-        TGeoNavigator* nav = gGeoManager->GetCurrentNavigator();
-        Int_t vol_local_id = nav->GetCurrentNode()->GetNumber() % 1000000; // Local ID within the mat or scint.
-        // cout << "detID_1: " << detID_1 << "  " << fELoss << endl;
-		Int_t layer_id = nav->GetMother(3)->GetNumber(); // Get layer ID.
-        fVolumeID = 100000000 + layer_id * 1000000 + vol_local_id; // 1e8 + layer_id * 1e6 + fibre_local_id;
-        // cout << "MTCDetector::ProcessHits: fVolumeID = " << fVolumeID << "  " << nav->GetMother(3)->GetNumber() << endl;
-    }
-    // Sum energy loss for all steps in the active volume
-    fELoss += gMC->Edep();
-
-    // Create vetoPoint when exiting active volume
-    if (gMC->IsTrackExiting() || gMC->IsTrackStop() || gMC->IsTrackDisappeared()) {
-
-        if (fELoss == 0.) {
-            return kFALSE;
-        }   // if you do not want hits with zero eloss
-
-        TParticle* p = gMC->GetStack()->GetCurrentTrack();
-        fTrackID = gMC->GetStack()->GetCurrentTrackNumber();
-        Int_t pdgCode = p->GetPdgCode();
-        Int_t detID_1;
-        // TGeoNavigator* nav = gGeoManager->GetCurrentNavigator();
-        gMC->CurrentVolID(detID_1);
-		// Int_t vol_local_id = nav->GetNumber() % 1000000; // Local ID within the mat or scint.
-        // Int_t vol_local_id = detID_1 % 1000000;
-        // cout << "detID_1: " << detID_1 << "  " << fELoss << endl;
-		// Int_t layer_id = nav->GetMother()->GetNumber(); // Get layer ID.
-        // Int_t detID = 100000000 + layer_id * 1000000 + vol_local_id; // 1e8 + layer_id * 1e6 + fibre_local_id;
-
-        // cout << "MTCDetector::ProcessHits: detID = " << detID << "  " << detID_1 << "  " << nav->GetMother()->GetNumber() << endl;
-        // 1) get current node
-        // TGeoNode* curr = nav->GetCurrentNode();
-        // if (curr) {
-        //     std::cout << " Level(0) (current): name=\""
-        //             << curr->GetName() << "\"  id="
-        //             << curr->GetNumber() << "  " << detID_1 << "  " << fELoss << "\n";
-        // } else {
-        //     std::cout << " Level(0) (current): NULL\n";
-        // }
-        // Int_t depth = nav->GetLevel();            // how many steps from top
-        // std::cout << "Current depth: " << depth << "\n";
-        // for (int lvl = 1; lvl <= depth; ++lvl) {
-        //     TGeoNode* mom = nav->GetMother(lvl);
-        //     if (mom) {
-        //         std::cout << " Mother(" << lvl << ") = \""
-        //                 << mom->GetName() << "\"  id="
-        //                 << mom->GetNumber()  << "\n";
-        //     } else {
-        //         std::cout << " Mother(" << lvl << ") = NULL\n";
-        //     }
-        // }
-        TLorentzVector Pos;
-        gMC->TrackPosition(Pos);
-        TLorentzVector Mom;
-        gMC->TrackMomentum(Mom);
-        Double_t x, y, z;
-        if (fVolumeID / 100000 == 3) {
-            x = (fPos.X() + Pos.X()) / 2.;
-            y = (fPos.Y() + Pos.Y()) / 2.;
-            z = (fPos.Z() + Pos.Z()) / 2.;
-            }
-            else {
-            x = fPos.X();
-            y = fPos.Y();
-            z = (fPos.Z() + Pos.Z()) / 2.;
-            }
-
-        auto hit = AddHit(fTrackID,
-                fVolumeID,
-                TVector3(x, y, z),
-                TVector3(fMom.Px(), fMom.Py(), fMom.Pz()),   // entrance momentum
-                fTime,
-                fLength,
-                fELoss,
-                pdgCode);
-        // hit->Print();
-        ShipStack* stack = dynamic_cast<ShipStack*>(gMC->GetStack());
-        stack->AddPoint(kMTC);
-    }
-    return kTRUE;
-}
 
 void MTCDetector::Register()
 {
@@ -865,7 +784,6 @@ MtcDetPoint* MTCDetector::AddHit(Int_t trackID,
 {
     TClonesArray& clref = *fMTCDetectorPointCollection;
     Int_t size = clref.GetEntriesFast();
-    // cout << Form("MTCDetector::AddHit: Adding hit %d with detID %d at position (%.3f, %.3f, %.3f) with momentum (%.3f, %.3f, %.3f), time %.3f, length %.3f, eLoss %.3f, pdgCode %d",
-    //     size, detID, pos.X(), pos.Y(), pos.Z(), mom.Px(), mom.Py(), mom.Pz(), time, length, eLoss * 1.0e6, pdgCode);
+
     return new (clref[size]) MtcDetPoint(trackID, detID, pos, mom, time, length, eLoss, pdgCode);
 }

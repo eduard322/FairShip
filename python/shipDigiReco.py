@@ -732,11 +732,7 @@ class ShipDigiReco:
     hit_container = {}
     mc_points = {}
     norm = {}
-    print("MTC digitization: found", len(self.siPMFibres_U), "U fibres and", len(self.siPMFibres_V), "V fibres")
-    print("MTC digitization: found", len(self.fibresSiPMU), "U SiPMs and", len(self.fibresSiPMV), "V SiPMs")
-    # exit(0)
     for k, mc_point in enumerate(self.sTree.MtcDetPoint):
-      print("MTC digitization: processing point", k, "of", self.sTree.MtcDetPoint.GetEntriesFast(), "detector ID:", mc_point.GetDetectorID())
       det_id = mc_point.GetDetectorID()
       station_type = mc_point.GetStationType() # 0 for +5 degrees, 1 for -5 degrees, 2 for scint plane, extraction: int(fDetectorID / 100000) % 10
       energy_loss = mc_point.GetEnergyLoss()
@@ -786,7 +782,6 @@ class ShipDigiReco:
         mc_points[global_channel][k] = d_e
         norm[global_channel] += d_e
 
-    print("MTC digitization: found", len(hit_container), "global channels with hits")
     for det_id in hit_container:
       all_points = ROOT.std.vector('MtcDetPoint*')()
       all_weights = ROOT.std.vector('Float_t')()
@@ -794,13 +789,11 @@ class ShipDigiReco:
       for entry in hit_container[det_id]:
         all_points.push_back(entry[0])
         all_weights.push_back(entry[1])
-      print("checking MTC digitization for det_id:", det_id, "with", len(all_points), "points")
       det_hit = ROOT.MtcDetHit(det_id, all_points, all_weights)
       self.digiMTC.push_back(det_hit)
     # digi2MCPoints will be added later
     #   for idx, de_value in mc_points[det_id].items():
     #     mc_links.Add(det_id, idx, de_value / norm[det_id])
-    print("Container size after MTC digitization:", self.digiMTC.size())
 
 
 
