@@ -2,8 +2,12 @@ import ROOT
 import shipDet_conf
 from rootpyPickler import Unpickler
 import argparse
+import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+from matplotlib import transforms
+from matplotlib.patches import Polygon
+
 
 
 class SciFiMapping:
@@ -79,6 +83,26 @@ class SciFiMapping:
                     "xpos": z.second[1],
                 }
 
+    def create_sipm_to_position_map(self):
+        """
+        Create a mapping from SiPM channels to their positions in the SciFi detector.
+
+        This method retrieves the SiPM positions for both U and V planes and constructs
+        dictionaries mapping each SiPM channel index to its corresponding position.
+
+        Side Effects
+        ------------
+        Sets attributes 'sipm_pos_U' and 'sipm_pos_V'.
+        """
+        sipm_pos_U_raw = self.scifi.GetSiPMPos_U()
+        sipm_pos_V_raw = self.scifi.GetSiPMPos_V()
+        self.sipm_pos_U, self.sipm_pos_V = {}, {}
+
+        for pair in sipm_pos_U_raw:
+            self.sipm_pos_U[pair.first] = pair.second
+        for pair in sipm_pos_V_raw:
+            self.sipm_pos_V[pair.first] = pair.second
+
     def make_mapping(self):
         """
         Execute the full mapping sequence for the SciFi detector.
@@ -92,6 +116,7 @@ class SciFiMapping:
         self.scifi.SiPMmapping()
         self.create_fibre_to_simp_map()
         self.create_sipm_to_fibre_map()
+        self.create_sipm_to_position_map()
 
     def get_sipm_to_fibre_map(self):
         """
@@ -115,7 +140,7 @@ class SciFiMapping:
         """
         return self.fibre_to_simp_map_U, self.fibre_to_simp_map_V
 
-    def draw_channel(self, channel):
+    def draw_channel(self, sGeo, channel):
         """
         Draw a single channel mapping showing fibre positions and the SiPM sensor.
 
@@ -149,7 +174,8 @@ class SciFiMapping:
                 else fibre + 100000000 + 1000000 + 1 * 100000
             )
             self.scifi.GetPosition(globfiberID, AF, BF)
-            loc = self.scifi.GetLocalPos(globfiberID, AF)
+            loc = self.scifi.GetLocalPos(globfiberID, BF)
+            print(f"Position for fibre {globfiberID} A: {BF.X()}, {BF.Y()}, {BF.Z()}")
             fibre_positions.append((loc[0], loc[2]))
             if xmin > loc[0]:
                 xmin = loc[0]
@@ -170,7 +196,8 @@ class SciFiMapping:
             )
             ax.add_patch(ellipse)
         self.scifi.GetSiPMPosition(locChannel, AF, BF)
-        loc = self.scifi.GetLocalPos(globfiberID, AF)
+        loc = self.scifi.GetLocalPos(globfiberID, BF)
+        print(f"SiPM position for channel {channel}: {loc[0]}, {loc[1]}, {loc[2]}")
         rect = patches.Rectangle(
             (loc[0] - DX, loc[2] - DZ),
             2 * DX,
@@ -191,7 +218,10 @@ class SciFiMapping:
 
     def draw_many_channels(
         self,
-        output_file="scifi_mapping_all_channels.pdf",
+        sGeo,
+        number_of_channels=20,
+        output_file="scifi_mapping_many_channels.pdf",
+        labeling = True,
         figsize=(16, 16),
         dpi=300,
         cmap_name="tab20",
@@ -220,9 +250,63 @@ class SciFiMapping:
         # Prepare fig & ax
         fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
 
+        # Geometry constants
+        fibreVol = sGeo.FindVolumeFast("FiberVol")
+        R = fibreVol.GetShape().GetDX()
+        DX, DZ = 0.025, 0.135 / 2
+
+
         # Select your channels. Hardcoded range for demonstration
-        channelsU = sorted(self.fibre_to_simp_map_U.keys())[:10]
-        channelsV = sorted(self.fibre_to_simp_map_V.keys())[::-1][86:96]
+        # channelsU = sorted(self.fibre_to_simp_map_U.keys())[:10]
+        # channelsV = sorted(self.fibre_to_simp_map_V.keys())[::-1][86:96]
+
+        # Find SiPM channel in the center of the U and V planes
+        center_channel_U = [chan for chan, x_pos in self.sipm_pos_U.items() if abs(x_pos) <= DX - 0.001][0]
+        center_channel_V = [chan for chan, x_pos in self.sipm_pos_V.items() if abs(x_pos) <= DX - 0.001][0]
+
+        def get_surrounding_keys(d: dict, target_key, N: int):
+            """
+            Given a dict `d`, find `target_key` in the ordering of keys sorted by their values,
+            and return up to N//2 keys that come before it and N//2 keys that come after it
+            (excluding the target_key itself).
+
+            Parameters
+            ----------
+            d : dict
+                Mapping from keys to comparable values.
+            target_key : hashable
+                The key around which to collect neighbors.
+            N : int
+                Total number of neighbors to return (N//2 before, N//2 after).
+
+            Returns
+            -------
+            list
+                List of up to N keys: first the keys before, then the keys after.
+            """
+            # 1) sort keys by their associated values
+            sorted_keys = sorted(d.keys(), key=lambda k: d[k])
+            # 2) locate the target
+            try:
+                idx = sorted_keys.index(target_key)
+            except ValueError:
+                raise KeyError(f"Target key {target_key!r} not found in dictionary")
+
+            half = N // 2
+            # 3) slice out the neighbors
+            start = max(0, idx - half)
+            end_before = idx
+            start_after = idx + 1
+            end_after = idx + 1 + half
+
+            before = sorted_keys[start:end_before]
+            after  = sorted_keys[start_after:end_after]
+
+            return before + [target_key] +  after
+
+        channelsU = get_surrounding_keys(self.sipm_pos_U, center_channel_U, number_of_channels)
+        channelsV = get_surrounding_keys(self.sipm_pos_V, center_channel_V, number_of_channels)
+
         channels = channelsU + channelsV
         n_chan = len(channels)
 
@@ -230,18 +314,13 @@ class SciFiMapping:
         cmap = plt.get_cmap(cmap_name)
         colors = [cmap(i / (n_chan - 1)) for i in range(n_chan)]
 
-        # Geometry constants
-        fibreVol = sGeo.FindVolumeFast("FiberVol")
-        R = fibreVol.GetShape().GetDX()
-        DX, DZ = 0.025, 0.135 / 2
-
         AF = ROOT.TVector3()
         BF = ROOT.TVector3()
 
         # Loop through all channels
         for idx, chan in enumerate(channels):
             col = colors[idx]
-
+            isU = chan in channelsU
             # decode local channel
             locChan = chan % 1_000_000
 
@@ -256,20 +335,24 @@ class SciFiMapping:
                     else fibreID + 100000000 + 1000000 + 1 * 100000
                 )
                 self.scifi.GetPosition(globfiberID, AF, BF)
-                loc = self.scifi.GetLocalPos(fibreID, AF)
+                loc = self.scifi.GetLocalPos(fibreID, BF)
                 xs.append(loc[0])
                 ys.append(loc[2])
 
             # draw fibres (still orange)
             for x, y in zip(xs, ys):
                 ell = patches.Ellipse(
-                    (x, y), 2 * R, 2 * R, color="orange", alpha=alpha_fibre
+                    (x, y), 2 * R, 2 * R,
+                    fill=False,
+                    edgecolor='black',
+                    linewidth=1,
+                    alpha=alpha_fibre
                 )
                 ax.add_patch(ell)
 
             # draw SiPM rect in its unique shade
             self.scifi.GetSiPMPosition(chan, BF, AF)
-            loc_siPM = self.scifi.GetLocalPos(fibreID, AF)
+            loc_siPM = self.scifi.GetLocalPos(fibreID, BF)
             rx, ry = loc_siPM[0], loc_siPM[2]
             rect = patches.Rectangle(
                 (rx - DX, ry - DZ),
@@ -277,33 +360,35 @@ class SciFiMapping:
                 2 * DZ,
                 linewidth=1,
                 edgecolor="black",
-                facecolor=col,
+                facecolor= "blue" if isU else "red",  # override with solid colors for clarity,
                 alpha=alpha_fibre * 0.8,
-                hatch="//",
+                hatch="//" if isU else "\\\\"
             )
             ax.add_patch(rect)
 
-            # compute a fontsize that fits the rect width
-            # 1) data→display coords:
-            p0 = ax.transData.transform((rx - DX, ry))
-            p1 = ax.transData.transform((rx + DX, ry))
-            disp_width = abs(p1[0] - p0[0])
-            # 2) convert px→points (1pt = 1/72in; fig.dpi px/inch):
-            pts = disp_width * 72.0 / fig.dpi
-            fontsize = max(4, min(12, pts * 0.8))
 
-            # label above the rect
-            text = f"SiPM: {(chan // 1000) % 10} \n ch: {chan % 1000}"
-            ax.text(
-                rx - DX / 2,
-                ry + DZ + R * 0.1,
-                text,
-                ha="left",
-                va="bottom",
-                fontsize=fontsize,
-                color="black",
-                clip_on=True,
-            )
+            if labeling:
+                # compute a fontsize that fits the rect width
+                # 1) data→display coords:
+                p0 = ax.transData.transform((rx - DX, ry))
+                p1 = ax.transData.transform((rx + DX, ry))
+                disp_width = abs(p1[0] - p0[0])
+                # 2) convert px→points (1pt = 1/72in; fig.dpi px/inch):
+                pts = disp_width * 72.0 / fig.dpi
+                fontsize = max(2, min(12, pts * 0.8))
+
+                # label above the rect
+                text = f"SiPM: {(chan // 1000) % 10} \n ch: {chan % 1000}"
+                ax.text(
+                    rx - DX / 2,
+                    ry + DZ + R * 0.1,
+                    text,
+                    ha="left",
+                    va="bottom",
+                    fontsize=fontsize,
+                    color="black",
+                    clip_on=True,
+                )
 
         # finalize plot
         ax.relim()
@@ -320,6 +405,305 @@ class SciFiMapping:
         plt.savefig(output_file)
         plt.close(fig)
         print(f"Saved overlay plot of {n_chan} channels to {output_file}")
+
+
+
+    def draw_channel_XY(
+        self,
+        number_of_channels=20,
+        real_event = False,
+        x_coords = None,
+        output_file="scifi_channel_ribbons_XY.pdf",
+        figsize=(16,16),
+        dpi=300,
+        labeling=False
+    ):
+        """
+        Simplified X–Y view: one ribbon per channel (no per-fiber loops).
+        Ribbons span Y from -25 to +25 (length=50 cm), thickness equal to channel height = 2*DZ,
+        tilted +5° for U-plane channels, -5° for V-plane. SiPM boxes sit on top at y=25→25+2*DZ.
+
+        Parameters
+        ----------
+        number_of_channels : int
+            Total ribbons (split around center) per plane.
+        output_file : str
+            Path to save the PDF.
+        labeling : bool
+            If True, annotate each ribbon with channel number.
+        """
+
+        # 2) Geometry constants
+        DZ = 0.135 / 2             # SiPM half-height [cm]
+        DX = 0.025                 # SiPM half-width [cm]
+        L = 50.0                   # ribbon length (full Y-span) [cm]
+        angle_U = -5.0             # tilt for U
+        angle_V = +5.0             # tilt for V
+
+        if not real_event:
+            alpha_sipm, alpha_fibre = 0.75, 0.5
+        else:
+            alpha_sipm, alpha_fibre = 0.1, 0.1
+            # find the channels corresponding to x_coords
+            channels_x_U = next(c for c, x in self.sipm_pos_U.items() if abs(x-x_coords[0]) < DX)
+            channel_x_U = [c for c, x in self.sipm_pos_U.items() if abs(x-x_coords[0]) < DX][0]
+            channels_x_V = next(c for c, x in self.sipm_pos_V.items() if abs(x-x_coords[1]) < DX)
+            channel_x_V = [c for c, x in self.sipm_pos_V.items() if abs(x-x_coords[1]) < DX][0]
+        # 1) Figure setup
+        fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+
+
+        # get center channels + neighbors
+        centerU = next(c for c, x in self.sipm_pos_U.items() if abs(x) < DX)
+        centerV = next(c for c, x in self.sipm_pos_V.items() if abs(x) < DX)
+
+        def get_surrounding(d, target, N):
+            keys = sorted(d.keys(), key=lambda k: d[k])
+            i = keys.index(target)
+            half = N // 2
+            start = max(0, i - half)
+            end = min(len(keys), i + half + 1)
+            return keys[start:end]
+
+        if not real_event:
+            chansU = get_surrounding(self.sipm_pos_U, centerU, number_of_channels)
+            chansV = get_surrounding(self.sipm_pos_V, centerV, number_of_channels)
+        else:
+            chansU = get_surrounding(self.sipm_pos_U, channels_x_U, number_of_channels)
+            chansV = get_surrounding(self.sipm_pos_V, channels_x_V, number_of_channels)
+        all_chans = chansU + chansV
+
+        # cmap_U = plt.get_cmap('tab20')
+        # cmap_V = plt.get_cmap('tab20b')
+        # colorsU = [cmap_U(i/(len(chansU)-1)) for i in range(len(chansU))]
+        # colorsV = [cmap_V(i/(len(chansV)-1)) for i in range(len(chansV))]
+        # 3) Draw ribbons and SiPM boxes per channel
+        k_U, k_V = 0, 0
+        for idx, chan in enumerate(all_chans):
+            # if chan % 2 == 1:
+            #     continue
+            # if chan in chansU:
+            #     k_U += 1
+            # else:
+            #     k_V += 1
+
+            isU = chan in chansU
+            x0 = self.sipm_pos_U[chan] if isU else self.sipm_pos_V[chan]
+            angle = angle_U if isU else angle_V
+
+            alpha = np.deg2rad(angle)          # e.g. angle_deg = +5 or -5
+            dx = DX
+            dy = L/2
+            shift = dy * np.tan(alpha)             # horizontal shear of bottom edge
+            # define the four corners in XY
+            coords = [
+                (x0 - dx, +dy),                    # top-left
+                (x0 + dx, +dy),                    # top-right
+                (x0 + dx - shift, -dy),            # bottom-right
+                (x0 - dx - shift, -dy),            # bottom-left
+            ]
+
+            # col = colorsU[k_U] if isU else colorsV[k_V]
+            col = "blue" if isU else "red"  # override with solid colors for clarity
+            if not real_event:
+                ribbon = patches.Polygon(
+                    coords, closed=True,
+                    facecolor=col,     # fill in your color
+                    edgecolor='black',
+                    alpha=alpha_fibre          # semi-transparent
+                )
+                ax.add_patch(ribbon)
+
+                y_top = L/2 if isU else L/2 + DZ
+
+                box = patches.Rectangle(
+                    (x0 - DX, y_top), 2*DX, DZ,
+                    facecolor=col,     # same fill color
+                    edgecolor='black',
+                    alpha=alpha_sipm,          # a bit more opaque
+                    hatch="//" if isU else '\\\\'
+                )
+                ax.add_patch(box)
+            else:
+                if channel_x_U == chan or channel_x_V == chan:
+                    # draw the ribbon
+                    ribbon = patches.Polygon(
+                        coords, closed=True,
+                        facecolor=col,     # fill in your color
+                        edgecolor='black',
+                        alpha=0.50          # semi-transparent
+                    )
+                    ax.add_patch(ribbon)
+
+                    y_top = L/2 if isU else L/2 + DZ
+
+                    box = patches.Rectangle(
+                        (x0 - DX, y_top), 2*DX, DZ,
+                        facecolor=col,     # same fill color
+                        edgecolor='black',
+                        alpha=0.75,          # a bit more opaque
+                        hatch="//" if isU else '\\\\'
+                    )
+                    ax.add_patch(box)
+                else:
+                    ribbon = patches.Polygon(
+                        coords, closed=True,
+                        facecolor=col,     # fill in your color
+                        edgecolor='black',
+                        alpha=alpha_fibre          # semi-transparent
+                    )
+                    ax.add_patch(ribbon)
+
+                    y_top = L/2 if isU else L/2 + DZ
+
+                    box = patches.Rectangle(
+                        (x0 - DX, y_top), 2*DX, DZ,
+                        facecolor=col,     # same fill color
+                        edgecolor='black',
+                        alpha=alpha_sipm,          # a bit more opaque
+                        hatch="//" if isU else '\\\\'
+                    )
+                    ax.add_patch(box)
+
+        # 4) Finalize plot
+        ax.set_aspect('equal')
+        if not real_event:
+            min_x = min([self.sipm_pos_U[chan] for chan in chansU]) - 3 * np.tan(alpha)
+            max_x = max(self.sipm_pos_V[chan] for chan in chansV) + 3 * np.tan(alpha)
+            ax.set_xlim(min_x, max_x)
+            ax.set_ylim(22, 26)
+        else:
+            # min_x = min([self.sipm_pos_U[chan] for chan in chansU]) - 3 * np.tan(alpha)
+            # max_x = max(self.sipm_pos_V[chan] for chan in chansV) + 3 * np.tan(alpha)
+            min_x, max_x = -25, 25
+            ax.set_ylim(-25, 26)
+        ax.set_xlim(min_x, max_x)
+        # ax.set_ylim(22, 26)
+        ax.set_xlabel('X [cm]')
+        ax.set_ylabel('Y [cm]')
+        ax.set_title('SciFi channel ribbons & SiPM boxes (X–Y view)')
+        ax.grid(True)
+        # create legend handles
+        legend_handles = [
+            patches.Patch(facecolor='blue', edgecolor='black', hatch='//', label='U plane', alpha=0.75),
+            patches.Patch(facecolor='red',  edgecolor='black', hatch='\\\\', label='V plane', alpha=0.75),
+        ]
+
+        ax.legend(handles=legend_handles, title="Plane", loc='upper right')
+        plt.tight_layout()
+        plt.savefig(output_file)
+        plt.close(fig)
+        print(f"Saved channel ribbons + SiPM boxes to {output_file}")
+
+
+    def draw_combined_scifi_views(
+        self,
+        sGeo,
+        number_of_channels=20,
+        output_file="scifi_combined_views.pdf",
+        figsize=(18, 8),
+        dpi=300,
+        labeling=True,
+        alpha_fibre=0.4
+    ):
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize, dpi=dpi)
+
+        fibreVol = sGeo.FindVolumeFast("FiberVol")
+        R = fibreVol.GetShape().GetDX()
+        DX, DZ = 0.025, 0.135 / 2
+
+        center_U = [chan for chan, x in self.sipm_pos_U.items() if abs(x) <= DX - 0.001][0]
+        center_V = [chan for chan, x in self.sipm_pos_V.items() if abs(x) <= DX - 0.001][0]
+
+        def get_keys(d, target, N):
+            ks = sorted(d, key=lambda k: d[k])
+            i = ks.index(target)
+            half = N // 2
+            start = max(0, i - half)
+            end = min(len(ks), i + half + 1)
+            return ks[start:end]
+
+        chansU = get_keys(self.sipm_pos_U, center_U, number_of_channels)
+        chansV = get_keys(self.sipm_pos_V, center_V, number_of_channels)
+        channels = chansU + chansV
+        n_chan = len(channels)
+        cmap = plt.get_cmap('tab20')
+        colors = [cmap(i/(n_chan-1)) for i in range(n_chan)]
+
+        AF = ROOT.TVector3()
+        BF = ROOT.TVector3()
+        for idx, chan in enumerate(channels):
+            col = colors[idx]
+            locChan = chan % 1000000
+            fmap = self.fibre_to_simp_map_U if chan in chansU else self.fibre_to_simp_map_V
+            xs, zs = [], []
+            for fid in fmap[locChan]:
+                gid = fid + int(1e8 + 1e6 + (0 if chan in chansU else 1) * 1e5)
+                self.scifi.GetPosition(gid, AF, BF)
+                loc = self.scifi.GetLocalPos(fid, BF)
+                xs.append(loc[0]); zs.append(loc[2])
+            for x, z in zip(xs, zs):
+                ell = patches.Ellipse((x, z), 2*R, 2*R, color='orange', alpha=alpha_fibre)
+                ax1.add_patch(ell)
+            self.scifi.GetSiPMPosition(chan, BF, AF)
+            loc = self.scifi.GetLocalPos(fid, BF)
+            rx, rz = loc[0], loc[2]
+            rect = patches.Rectangle((rx-DX, rz-DZ), 2*DX, 2*DZ,
+                                    linewidth=1, edgecolor='black', facecolor=col,
+                                    alpha=alpha_fibre*0.8)
+            ax1.add_patch(rect)
+
+        ax1.set_xlabel('X [cm]')
+        ax1.set_ylabel('Z [cm]')
+        ax1.set_aspect('equal')
+        ax1.grid(True)
+        ax1.set_title('Z–X: SciFi mappings')
+
+        DZ = 0.135/2
+        DX = 0.025
+        L = 50.0
+        angleU = 5.0
+        angleV = -5.0
+        centerU = [c for c, x in self.sipm_pos_U.items() if abs(x) < DX][0]
+        centerV = [c for c, x in self.sipm_pos_V.items() if abs(x) < DX][0]
+        chansU = get_keys(self.sipm_pos_U, centerU, number_of_channels)
+        chansV = get_keys(self.sipm_pos_V, centerV, number_of_channels)
+        all_ch = chansU + chansV
+        colorsU = [plt.get_cmap('Blues')(i/max(len(chansU)-1,1)) for i in range(len(chansU))]
+        colorsV = [plt.get_cmap('Reds')(i/max(len(chansV)-1,1)) for i in range(len(chansV))]
+
+        for chan in all_ch:
+            isU = chan in chansU
+            x0 = self.sipm_pos_U[chan] if isU else self.sipm_pos_V[chan]
+            angle = angleU if isU else angleV
+            alpha_rad = np.deg2rad(angle)
+            dy = L/2; dx = DX; shift = dy*np.tan(alpha_rad)
+            coords = [(x0-dx, dy), (x0+dx, dy), (x0+dx-shift, -dy), (x0-dx-shift, -dy)]
+            col = colorsU[chansU.index(chan)] if isU else colorsV[chansV.index(chan)]
+            poly = patches.Polygon(coords, closed=True, facecolor=col, edgecolor='black', alpha=0.5)
+            ax2.add_patch(poly)
+            y_top = dy
+            box = patches.Rectangle((x0-DX, y_top), 2*DX, 2*DZ, facecolor=col, edgecolor='black', alpha=0.75)
+            ax2.add_patch(box)
+
+        ax2.set_xlabel('X [cm]')
+        ax2.set_ylabel('Y [cm]')
+        ax2.set_aspect('equal')
+        ax2.grid(True)
+        ax2.set_title('X–Y: Channel ribbons')
+
+        legend_handles = [
+            patches.Patch(facecolor='blue', edgecolor='black', hatch='//', label='U plane', alpha=0.75),
+            patches.Patch(facecolor='red', edgecolor='black', hatch='\\', label='V plane', alpha=0.75)
+        ]
+        ax2.legend(handles=legend_handles, title='Plane', loc='upper right')
+
+        plt.tight_layout()
+        plt.savefig(output_file)
+        plt.close(fig)
+
+
+
 
 
 if __name__ == "__main__":
@@ -353,5 +737,54 @@ if __name__ == "__main__":
     # -----Create SciFiMapping instance--------------------------------
     SciFiMapping = SciFiMapping(modules)
     SciFiMapping.make_mapping()
-    SciFiMapping.draw_channel(101104120)  # Example channel
-    SciFiMapping.draw_many_channels("scifi_mapping_all_channels.pdf")
+    SciFiMapping.draw_channel(sGeo, 101104120)  # Example channel
+    SciFiMapping.draw_many_channels(sGeo, number_of_channels = 20, output_file = "scifi_mapping_all_channels.pdf", labeling = False)
+    SciFiMapping.draw_channel_XY(number_of_channels = 20, output_file = "scifi_mapping_all_channels_XY.pdf")
+    SciFiMapping.draw_channel_XY(
+        number_of_channels = 100,
+        real_event = True,
+        x_coords = [1., 3.],
+        output_file = "scifi_channel_ribbons_XY_real_event.pdf",
+        labeling = False)
+    # SciFiMapping.draw_combined_scifi_views(sGeo, number_of_channels = 50, output_file = "scifi_mapping_all_channels_combined.pdf")
+
+    # for i in range(100100000, 100100000 + 1826):
+    #     AF = ROOT.TVector3()
+    #     BF = ROOT.TVector3()
+    #     SciFiMapping.scifi.GetPosition(i, AF, BF)
+    #     print(f"Position for fibre {i} A: {AF.X()}, {AF.Y()}, {AF.Z()}")
+    #     print(f"Position for fibre {i} B : {BF.X()}, {BF.Y()}, {BF.Z()}")
+    # fig, ax = plt.subplots(figsize=(8, 8))
+    # for sipm in range(8):
+    #     x_coord, y_coord = [], []
+    #     global_id = (101000 + sipm) * 1000
+    #     for i in range(global_id, global_id + 128):
+    #         # SciFiMapping.draw_channel(sGeo, i)
+    #         AF = ROOT.TVector3()
+    #         BF = ROOT.TVector3()
+    #         SciFiMapping.scifi.GetSiPMPosition(i % 1000000, BF, AF)
+    #         print(f"SiPM position for channel {i}: {AF.X()}, {AF.Y()}, {AF.Z()}")
+    #         # (global_id // 1000000 * 10 + 1) + global_id % 100000
+    #         AF = ROOT.TVector3()
+    #         BF = ROOT.TVector3()
+    #         SciFiMapping.scifi.GetSiPMPosition((i + 100000) % 1000000, AF, BF)
+    #         print(f"SiPM position for channel {(i + 100000)}: {AF.X()}, {AF.Y()}, {AF.Z()}")
+    #         x_coord.append(AF.X())
+    #         y_coord.append(AF.Y())
+    #     ax.scatter(x_coord, y_coord, marker="o", label=f"SiPM {sipm} Positions")
+    # ax.set_xlabel("X [cm]")
+    # ax.set_ylabel("Y [cm]")
+    # ax.set_title("SiPM Positions for Channels 101104000 to 101104127")
+    # ax.legend()
+    # ax.grid(True)
+    # fig.tight_layout()
+    # plt.savefig("scifi_sipm_positions.pdf")
+    # print(SciFiMapping.get_sipm_to_fibre_map()[1])
+    # print(SciFiMapping.get_fibre_to_simp_map()[0])
+    # print("#" * 50)
+    # print(SciFiMapping.get_fibre_to_simp_map()[1])
+    # AF = ROOT.TVector3()
+    # BF = ROOT.TVector3()
+    # SciFiMapping.scifi.GetSiPMPosition(101104127 % 1000000, BF, AF)
+    # print(f"SiPM position for channel 101104127: {AF.X()}, {AF.Y()}, {AF.Z()}")
+    # print(f"SiPM position for channel 101104127: {BF.X()}, {BF.Y()}, {BF.Z()}")
