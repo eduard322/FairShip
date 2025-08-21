@@ -61,6 +61,7 @@ def generate_genie_events(
     targetcode,
     inputflux,
     spline,
+    outputfile,
     process=None,
     seed=None,
     irun=None,
@@ -87,6 +88,7 @@ def generate_genie_events(
         + str(emin)
         + ","
         + str(emax)
+        + "--message-thresholds $GENIE/config/Messenger_laconic.xml"
     )
     cmd = (
         cmd
@@ -96,6 +98,8 @@ def generate_genie_events(
         + get_1D_flux_name(nupdg)
         + "  --cross-sections "
         + spline
+        + " -o"
+        + outputfile
     )
     # optional additional arguments
     if process is not None:
