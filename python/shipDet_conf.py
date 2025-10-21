@@ -1,11 +1,11 @@
 #!/usr/bin/env python
-import ROOT
 import os
+
+import ROOT
 import shipunit as u
-from ShipGeoConfig import AttrDict, ConfigRegistry
-from ShieldUtils import find_shield_center
-from array import array
 import yaml
+from ShieldUtils import find_shield_center
+from ShipGeoConfig import AttrDict
 
 detectorList = []
 
@@ -202,6 +202,8 @@ def configure_snd_mtc(yaml_file, ship_geo):
         ship_geo.mtc_geo.angle,
         ship_geo.mtc_geo.ironThick,
         ship_geo.mtc_geo.sciFiThick,
+        ship_geo.mtc_geo.num_of_channels,
+        ship_geo.mtc_geo.num_of_agg_channels,
         ship_geo.mtc_geo.scintThick,
         ship_geo.mtc_geo.nLayers,
         ship_geo.mtc_geo.zPosition,
