@@ -1,6 +1,6 @@
 MTC:
-  width: 50                  # Active area width (cm)
-  height: 50                 # Active area height (cm)
+  width: 60                  # Active area width (cm)
+  height: 60                 # Active area height (cm)
   angle: 5                   # Tilt angle of fibers (degrees)
   ironThick: 5               # Magnetised iron thickness (cm)
   sciFiThick: 0.97           # SciFi layer thickness (cm)
