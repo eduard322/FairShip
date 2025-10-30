@@ -306,6 +306,7 @@ void MTCDetector::CreateSciFiModule(const char* name,
     Double_t layerThick = fiberMatThick / numFiberLayers;
     fFiberLength = fSciFiActiveY / cos(fSciFiBendingAngle * TMath::DegToRad())
                    - 2 * fFiberRadius * sin(fSciFiBendingAngle * TMath::DegToRad());
+    LOG(info) << "Fiber length set to " << fFiberLength << " cm";
     Int_t fNumFibers = static_cast<Int_t>(fSciFiActiveX / fFiberPitch);
 
     // --- Define the SciFi fiber volume ---
