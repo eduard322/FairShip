@@ -174,6 +174,29 @@ def configure_snd_siliconTarget(yaml_file, ship_geo):
     )
     detectorList.append(SiliconTarget)
 
+def configure_snd_SiWCalo(yaml_file, ship_geo):
+    with open(yaml_file) as file:
+        config = yaml.safe_load(file)
+    ship_geo.SiWCalo_geo = AttrDict(config['SiWCalo'])
+    # Initialize detector
+    if ship_geo.SiWCalo_geo.zPosition == "auto":
+        z_shift = ship_geo.SiliconTarget_geo.zPosition + 0.5*(ship_geo.SiliconTarget_geo.nLayers*ship_geo.SiliconTarget_geo.targetThickness+ship_geo.SiliconTarget_geo.targetSpacing) + 3
+        ship_geo.SiWCalo_geo.zPosition = 2840
+        print("SiWCalo zPosition set to ", ship_geo.SiWCalo_geo.zPosition)
+    SiWCalo = ROOT.SiWCalo("SiWCalo", ROOT.kTRUE)
+    SiWCalo.SetSiWCaloParameters(
+        ship_geo.SiWCalo_geo.targetWidth,
+        ship_geo.SiWCalo_geo.targetHeight,
+        ship_geo.SiWCalo_geo.sensorWidth,
+        ship_geo.SiWCalo_geo.sensorLength,
+        ship_geo.SiWCalo_geo.nLayers,
+        ship_geo.SiWCalo_geo.zPosition,
+        ship_geo.SiWCalo_geo.targetThickness,
+        ship_geo.SiWCalo_geo.targetSpacing,
+        ship_geo.SiWCalo_geo.moduleOffset
+    )
+    detectorList.append(SiWCalo)
+    
 def configure_veto(yaml_file, z0):
     with open(yaml_file) as file:
         config = yaml.safe_load(file)
@@ -318,6 +341,20 @@ def configure(run, ship_geo):
                     ship_geo.UpstreamTagger.Z_Position - 8 *u.cm - 5 *u.cm, #16 cm width of UpstreamTagger (8 cm half-width)
                     ship_geo.cave.floorHeightMuonShield,
                 )
+            elif design == 3:
+                # SND design 3 -- MTC/SiliconTarget/SiWCalo
+                configure_snd_mtc(
+                    os.path.join(os.environ["FAIRSHIP"], "geometry", "MTC_config.yaml"),
+                    ship_geo
+                )
+                configure_snd_siliconTarget(
+                    os.path.join(os.environ["FAIRSHIP"], "geometry", "SiliconTarget_config.yaml"),
+                    ship_geo
+                )
+                configure_snd_SiWCalo(
+                    os.path.join(os.environ["FAIRSHIP"], "geometry", "SiWCalo_config.yaml"),
+                    ship_geo
+                )
             else:
                 print(f"Warning: SND design {design} is not recognized.")
 
@@ -334,6 +371,12 @@ def configure(run, ship_geo):
     if ship_geo.SND:
         # If any SND design is 2 (MTC), set SNDSpace for MuonShield
         if 2 in getattr(ship_geo, 'SND_design', []):
+            MuonShield.SetSNDSpace(
+                hole = True,
+                hole_dx = (ship_geo.mtc_geo.width + 5. * u.cm) / 2.,
+                hole_dy = (ship_geo.mtc_geo.height + 5. * u.cm) / 2.
+            )
+        elif 3 in getattr(ship_geo, 'SND_design', []):
             MuonShield.SetSNDSpace(
                 hole = True,
                 hole_dx = (ship_geo.mtc_geo.width + 5. * u.cm) / 2.,
