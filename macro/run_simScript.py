@@ -170,6 +170,11 @@ parser.add_argument(
     nargs='+',
     default=[2],
 )
+parser.add_argument(
+  "--SND_location",
+  help="Choose the magnet in the Muon Shield where to locate the SND. Default: the last one",
+  default = -1,
+)
 parser.add_argument("--noSND", dest="SND", help="Deactivate SND. NOOP, as it currently defaults to off.", action='store_false')
 parser.add_argument("--target-yaml", help="Path to the yaml target config file", default=os.path.expandvars("$FAIRSHIP/geometry/target_config_Jun25.yaml"))
 parser.add_argument("--tag", dest="output_tag", help="Custom tag for output files instead of auto-generated UUID", default=None)
@@ -255,6 +260,7 @@ ship_geo = geometry_config.create_config(
      DecayVolumeMedium=options.decayVolMed,
      SND=options.SND,
      SND_design=options.SND_design,
+     SND_location=options.SND_location,
      TARGET_YAML=options.target_yaml
 )
 

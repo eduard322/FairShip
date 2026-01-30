@@ -137,6 +137,7 @@ def create_config(
     nuTargetPassive=1,
     SND=True,
     SND_design=None,
+    SND_location=None,
     TARGET_YAML=None,
 ):
     """
@@ -170,6 +171,7 @@ def create_config(
     if not isinstance(SND_design, list):
         SND_design = [SND_design]
     c.SND_design = SND_design
+    c.SND_location = SND_location
     c.target_yaml = TARGET_YAML
     print("Info: Target using configuration:", c.target_yaml)
 
@@ -258,6 +260,9 @@ def create_config(
     c.muShield.half_length = []
     c.muShield.Entrance = []
 
+    if c.SND_location != -1 and c.SND_location >= len(params):
+        print(f"Magnet # {SND_location} does not exist. Placing SND in the last magnet.")
+        c.SND_location = -1
     for line in params:
         c.muShield.Zgap.append(line[0])
         c.muShield.half_length.append(line[1])
