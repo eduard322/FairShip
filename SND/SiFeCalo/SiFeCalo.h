@@ -3,20 +3,20 @@
 
 #include "FairDetector.h"
 #include "Rtypes.h"
-#include "SiWCaloPoint.h"
+#include "SiFeCaloPoint.h"
 #include "TClonesArray.h"
 #include "TGeoMedium.h"
 #include "TLorentzVector.h"
 #include "TVector3.h"
 
-class SiWCalo : public FairDetector
+class SiFeCalo : public FairDetector
 {
   public:
-    SiWCalo(const char* name, Bool_t Active, const char* Title = "");
-    SiWCalo();
-    virtual ~SiWCalo();
+    SiFeCalo(const char* name, Bool_t Active, const char* Title = "");
+    SiFeCalo();
+    virtual ~SiFeCalo();
 
-    void SetSiWCaloParameters(Double_t targetWidth,
+    void SetSiFeCaloParameters(Double_t targetWidth,
                                     Double_t targetHeight,
                                     Double_t sensorWidth,
                                     Double_t sensorLength,
@@ -34,14 +34,14 @@ class SiWCalo : public FairDetector
 				    Double_t NPixels,
 				    TGeoMedium* material,
                                     Int_t layerId);
-
+  
     virtual void ConstructGeometry();
     /** Initialization of the detector is done here */
     virtual void Initialize();
 
     virtual Bool_t ProcessHits(FairVolume* vol = 0);
 
-    SiWCaloPoint* AddHit(Int_t trackID,
+    SiFeCaloPoint* AddHit(Int_t trackID,
                                Int_t detID,
                                TVector3 pos,
                                TVector3 mom,
@@ -82,12 +82,12 @@ class SiWCalo : public FairDetector
     Double_t fModuleOffset;
 
     /** container for data points */
-    TClonesArray* fSiWCaloPointCollection;
+    TClonesArray* fSiFeCaloPointCollection;
 
-    SiWCalo(const SiWCalo&);
-    SiWCalo& operator=(const SiWCalo&);
+    SiFeCalo(const SiFeCalo&);
+    SiFeCalo& operator=(const SiFeCalo&);
     Int_t InitMedium(const char* name);
-    ClassDef(SiWCalo, 1)
+    ClassDef(SiFeCalo, 1)
 };
 
 #endif   // SND_SIWCALO_SIWCALO_H_
