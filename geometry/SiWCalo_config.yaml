@@ -1,10 +1,11 @@
 SiWCalo:
-  targetWidth: 18 #Tungsten width (cm)
-  targetHeight: 18 #Tungsten height (cm)
-  sensorWidth: 18 #Sensor active area -- width (cm)
-  sensorLength: 18 #Sensor active area -- height (cm)
-  nLayers: 5 #Number of tungsten + silicon layers
-  zPosition: auto #Default: auto -- centre of the second to last magnet in z
+  targetWidth: 36 #Tungsten width (cm)
+  targetHeight: 36 #Tungsten height (cm)
+  sensorWidth: 36 #Sensor active area -- width (cm)
+  sensorLength: 36 #Sensor active area -- height (cm)
+  nLayers: 8 #Number of tungsten + silicon layers
+  zPosition: auto #Default: auto -- ~2 cm after SiliconTarget (2838 by eye)
   targetThickness: 0.56 #Tungsten thickness (cm)
+  NPixels: 64 # 32*2 because it's 2x2 ASUSs
   targetSpacing: 1.1 #Spacing between pairs of tungsten layers (cm)
   moduleOffset: 0.1 #Spacing between tungsten surface and first silicon layer (cm)

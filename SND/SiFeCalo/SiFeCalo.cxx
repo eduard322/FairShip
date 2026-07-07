@@ -1,9 +1,9 @@
-#include "SiWCalo.h"
+#include "SiFeCalo.h"
 
 #include "ShipDetectorList.h"
 #include "ShipStack.h"
 #include "ShipUnit.h"
-#include "SiWCaloPoint.h"
+#include "SiFeCaloPoint.h"
 
 // ROOT / TGeo headers
 #include "TGeoBBox.h"
@@ -36,8 +36,8 @@
 
 using namespace ShipUnit;
 
-SiWCalo::SiWCalo()
-    : FairDetector("SiWCalo", kTRUE, kSiWCalo)
+SiFeCalo::SiFeCalo()
+    : FairDetector("SiFeCalo", kTRUE, kSiFeCalo)
     , fTrackID(-1)
     , fPdgCode()
     , fVolumeID(-1)
@@ -46,11 +46,11 @@ SiWCalo::SiWCalo()
     , fTime(-1.)
     , fLength(-1.)
     , fELoss(-1)
-    , fSiWCaloPointCollection(new TClonesArray("SiWCaloPoint"))
+    , fSiFeCaloPointCollection(new TClonesArray("SiFeCaloPoint"))
 {}
 
-SiWCalo::SiWCalo(const char* name, Bool_t Active, const char* Title)
-    : FairDetector(name, Active, kSiWCalo)
+SiFeCalo::SiFeCalo(const char* name, Bool_t Active, const char* Title)
+    : FairDetector(name, Active, kSiFeCalo)
     , fTrackID(-1)
     , fPdgCode()
     , fVolumeID(-1)
@@ -59,24 +59,24 @@ SiWCalo::SiWCalo(const char* name, Bool_t Active, const char* Title)
     , fTime(-1.)
     , fLength(-1.)
     , fELoss(-1)
-    , fSiWCaloPointCollection(new TClonesArray("SiWCaloPoint"))
+    , fSiFeCaloPointCollection(new TClonesArray("SiFeCaloPoint"))
 {}
 
-SiWCalo::~SiWCalo()
+SiFeCalo::~SiFeCalo()
 {
-    if (fSiWCaloPointCollection) {
-        fSiWCaloPointCollection->Delete();
-        delete fSiWCaloPointCollection;
+    if (fSiFeCaloPointCollection) {
+        fSiFeCaloPointCollection->Delete();
+        delete fSiFeCaloPointCollection;
     }
 }
 
-void SiWCalo::Initialize()
+void SiFeCalo::Initialize()
 {
     FairDetector::Initialize();
 }
 
 // -----   Private method InitMedium
-Int_t SiWCalo::InitMedium(const char* name)
+Int_t SiFeCalo::InitMedium(const char* name)
 {
     static FairGeoLoader* geoLoad = FairGeoLoader::Instance();
     static FairGeoInterface* geoFace = geoLoad->getGeoInterface();
@@ -95,7 +95,7 @@ Int_t SiWCalo::InitMedium(const char* name)
     return geoBuild->createMedium(ShipMedium);
 }
 
-void SiWCalo::SetSiWCaloParameters(Double_t targetWidth,
+void SiFeCalo::SetSiFeCaloParameters(Double_t targetWidth,
                                                Double_t targetHeight,
                                                Double_t sensorWidth,
                                                Double_t sensorLength,
@@ -119,7 +119,7 @@ void SiWCalo::SetSiWCaloParameters(Double_t targetWidth,
     fModuleOffset = moduleOffset;
 }
 
-TGeoVolume* SiWCalo::CreateSiliconPlanes(const char* name,
+TGeoVolume* SiFeCalo::CreateSiliconPlanes(const char* name,
                                                Double_t width,
                                                Double_t length,
                                                Double_t spacing,
@@ -203,11 +203,11 @@ TGeoVolume* SiWCalo::CreateSiliconPlanes(const char* name,
 }
 
 
-void SiWCalo::ConstructGeometry()
+void SiFeCalo::ConstructGeometry()
 {
 
-    InitMedium("tungstenalloySND");
-    TGeoMedium* tungsten = gGeoManager->GetMedium("tungstenalloySND");
+    InitMedium("iron");
+    TGeoMedium* iron = gGeoManager->GetMedium("iron");
     InitMedium("air");
     TGeoMedium* air = gGeoManager->GetMedium("air");
     InitMedium("silicon");
@@ -219,13 +219,13 @@ void SiWCalo::ConstructGeometry()
     Double_t totalLength = fLayers * fTargetSpacing;
 
     // --- Create an envelope volume for the detector (green, semi-transparent) ---
-    auto envBox = new TGeoBBox("SiWCalo_env", fTargetWidth / 2., fTargetHeight / 2., totalLength / 2.);
-    auto envVol = new TGeoVolume("SiWCalo", envBox, air);
+    auto envBox = new TGeoBBox("SiFeCalo_env", fTargetWidth / 2., fTargetHeight / 2., totalLength / 2.);
+    auto envVol = new TGeoVolume("SiFeCalo", envBox, air);
     envVol->SetLineColor(kGreen);
     envVol->SetTransparency(50);
 
     auto target = new TGeoBBox("Target", fTargetWidth / 2., fTargetHeight / 2., fTargetThickness / 2.);
-    auto targetVol = new TGeoVolume("TargetVol", target, tungsten);
+    auto targetVol = new TGeoVolume("TargetVol", target, iron);
     targetVol->SetLineColor(kGray);
     targetVol->SetTransparency(40);
 
@@ -233,7 +233,7 @@ void SiWCalo::ConstructGeometry()
         // Compute the center position (z) for the current W layer
         Double_t zPos = -totalLength / 2 + i * fTargetSpacing;
 
-        // Place the tungsten layer
+        // Place the iron layer
         envVol->AddNode(targetVol, i, new TGeoTranslation(0, 0, zPos + fTargetThickness / 2.));
 
         TGeoVolume* siliconPlanes = CreateSiliconPlanes("TrackerPlane",
@@ -250,7 +250,7 @@ void SiWCalo::ConstructGeometry()
     gGeoManager->GetTopVolume()->AddNode(envVol, 1, new TGeoTranslation(0, 0, fZPosition));
 }
 
-Bool_t SiWCalo::ProcessHits(FairVolume* vol)
+Bool_t SiFeCalo::ProcessHits(FairVolume* vol)
 {
     /** This method is called from the MC stepping */
     // Set parameters at entrance of volume. Reset ELoss.
@@ -265,7 +265,7 @@ Bool_t SiWCalo::ProcessHits(FairVolume* vol)
     // Sum energy loss for all steps in the active volume
     fELoss += gMC->Edep();
 
-    // Create SiWCaloPoint at exit of active volume
+    // Create SiFeCaloPoint at exit of active volume
     if (gMC->IsTrackExiting() || gMC->IsTrackStop() || gMC->IsTrackDisappeared()) {
 
         if (fELoss == 0.) {
@@ -294,39 +294,39 @@ Bool_t SiWCalo::ProcessHits(FairVolume* vol)
                pdgCode);
 
         ShipStack* stack = dynamic_cast<ShipStack*>(gMC->GetStack());
-        stack->AddPoint(kSiWCalo);
+        stack->AddPoint(kSiFeCalo);
     }
     return kTRUE;
 }
 
-void SiWCalo::EndOfEvent()
+void SiFeCalo::EndOfEvent()
 {
-    fSiWCaloPointCollection->Clear();
+    fSiFeCaloPointCollection->Clear();
 }
 
-void SiWCalo::Register()
+void SiFeCalo::Register()
 {
-    TString name = "SiWCaloPoint";
-    TString title = "SiWCalo";
-    FairRootManager::Instance()->Register(name, title, fSiWCaloPointCollection, kTRUE);
+    TString name = "SiFeCaloPoint";
+    TString title = "SiFeCalo";
+    FairRootManager::Instance()->Register(name, title, fSiFeCaloPointCollection, kTRUE);
     LOG(debug) << this->GetName() << ", Register() says: registered " << name << " collection";
 }
 
-TClonesArray* SiWCalo::GetCollection(Int_t iColl) const
+TClonesArray* SiFeCalo::GetCollection(Int_t iColl) const
 {
     if (iColl == 0) {
-        return fSiWCaloPointCollection;
+        return fSiFeCaloPointCollection;
     } else {
         return NULL;
     }
 }
 
-void SiWCalo::Reset()
+void SiFeCalo::Reset()
 {
-    fSiWCaloPointCollection->Clear();
+    fSiFeCaloPointCollection->Clear();
 }
 
-SiWCaloPoint* SiWCalo::AddHit(Int_t trackID,
+SiFeCaloPoint* SiFeCalo::AddHit(Int_t trackID,
                                           Int_t detID,
                                           TVector3 pos,
                                           TVector3 mom,
@@ -335,7 +335,7 @@ SiWCaloPoint* SiWCalo::AddHit(Int_t trackID,
                                           Double_t eLoss,
                                           Int_t pdgCode)
 {
-    TClonesArray& clref = *fSiWCaloPointCollection;
+    TClonesArray& clref = *fSiFeCaloPointCollection;
     Int_t size = clref.GetEntriesFast();
-    return new (clref[size]) SiWCaloPoint(trackID, detID, pos, mom, time, length, eLoss, pdgCode);
+    return new (clref[size]) SiFeCaloPoint(trackID, detID, pos, mom, time, length, eLoss, pdgCode);
 }

@@ -54,3 +54,4 @@ cc
 # Eclipse
 *.project
 *.pydevproject
+sw/

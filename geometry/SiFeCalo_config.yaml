@@ -1,0 +1,11 @@
+SiFeCalo:
+  targetWidth: 54 #Iron width (cm)
+  targetHeight: 54 #Iron height (cm)
+  sensorWidth: 54 #Sensor active area -- width (cm)
+  sensorLength: 54 #Sensor active area -- height (cm)
+  nLayers: 12 #Number of tungsten + silicon layers
+  zPosition: auto #Default: auto -- ~5 cm after MTC (3250)
+  targetThickness: 5.0 #Iron thickness (cm)
+  NPixels: 96 # 32*3 because it's 3x3 ASUSs
+  targetSpacing: 6.0 #Spacing between pairs of iron layers (cm)
+  moduleOffset: 0.1 #Spacing between tungsten surface and silicon layer (cm)

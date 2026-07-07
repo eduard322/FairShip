@@ -1,0 +1,51 @@
+#include "SiFeCaloHit.h"
+#include "FairRunSim.h"
+#include "ShipUnit.h"
+#include "SiFeCalo.h"
+#include "TGeoBBox.h"
+#include "TGeoManager.h"
+#include "TGeoNavigator.h"
+#include "TROOT.h"
+
+#include <iostream>
+
+SiFeCaloHit::SiFeCaloHit()
+    : ShipHit()
+{
+    flag = true;
+}
+
+SiFeCaloHit::SiFeCaloHit(Int_t detID, const std::vector<SiFeCaloPoint*>& V)
+{
+    // Sum up signal from all points within the hit
+    std::vector<double> _signals;
+    double totalSig = 0;
+
+    for (auto* point : V) {
+        _signals.push_back(point->GetEnergyLoss());
+        fX = point->GetX();
+        fY = point->GetY();
+        fZ = point->GetZ();
+    }
+
+    for (unsigned i = 0; i < _signals.size(); i++) {
+        totalSig += _signals[i];
+    }
+
+    fSignal = totalSig;
+}
+// -----   Destructor   ----------------------------------------------------
+SiFeCaloHit::~SiFeCaloHit() {}
+// -------------------------------------------------------------------------
+
+// -----   Public method Print   -------------------------------------------
+void SiFeCaloHit::Print()
+{
+    std::cout << Form("SiFeCaloHit: Detector ID %d, Layer %d, Pixel X %d, Pixel Y %d, Pixel ID %d, Signal %.2f \n",
+                      fDetectorID,
+                      GetLayer(),
+		      GetPixelX(),
+		      GetPixelY(),
+		      GetPixelID(),
+                      GetSignal());
+}
