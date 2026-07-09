@@ -18,7 +18,13 @@ class MTCDetector(BaseDetector):
                 lsOfGlobals.Add(global_variables.modules["MTC"])
             mapping = SciFiMapping.SciFiMapping(global_variables.modules)
             mapping.make_mapping()
+            # Per-block SiPM maps: the MTC is split longitudinally into blocks of
+            # different transverse size, so each block has its own map. These are
+            # lists indexed by block; select with block = layer // n_layers_per_block.
             self.sipm_to_fibre_map_U, self.sipm_to_fibre_map_V = mapping.get_sipm_to_fibre_map()
+            mtc = global_variables.modules["MTC"]
+            self.n_blocks = mtc.GetNBlocks()
+            self.n_layers_per_block = mtc.GetNLayersPerBlock()
 
     def digitize(self) -> None:
         """Digitize SND/MTC MC hits.
@@ -47,12 +53,17 @@ class MTCDetector(BaseDetector):
             station_type = mc_point.GetLayerType()
             energy_loss = mc_point.GetEnergyLoss()
 
+            # Which longitudinal block this hit belongs to (blocks differ in
+            # transverse size, hence in their SiPM map).
+            layer = (det_id // 1_000_000) % 100
+            block = min(layer // self.n_layers_per_block, self.n_blocks - 1)
+
             if station_type == 0:
                 # +5 degrees fiber station uses U fibers
-                fibre_map = self.sipm_to_fibre_map_U
+                fibre_map = self.sipm_to_fibre_map_U[block]
             elif station_type == 1:
                 # -5 degrees fiber station uses V fibers
-                fibre_map = self.sipm_to_fibre_map_V
+                fibre_map = self.sipm_to_fibre_map_V[block]
             elif station_type == 2:
                 # Scint Plane. Preserve the same logic as for fibre stations,
                 # but use the det_id directly as the global channel.

@@ -8,6 +8,7 @@
 #include <array>
 #include <map>
 #include <string>  // for string
+#include <vector>
 
 #include "Detector.h"
 #include "MTCDetPoint.h"
@@ -40,7 +41,7 @@ class MTCDetector : public SHiP::Detector<MTCDetPoint> {
   virtual void CreateSciFiModule(const char* name,
                                  TGeoVolumeAssembly* modMotherVol,
                                  Double_t width, Double_t height,
-                                 Double_t thickness, Int_t LayerId);
+                                 Double_t thickness, Int_t iBlock);
   void ConstructGeometry() override;
   /** Get position of single fibre in global coordinate system**/
   void GetPosition(Int_t fDetectorID, TVector3& vLeft,
@@ -50,23 +51,32 @@ class MTCDetector : public SHiP::Detector<MTCDetPoint> {
   /** mean position of fibre2 associated with SiPM channel **/
   void GetSiPMPosition(Int_t SiPMChan, TVector3& A, TVector3& B);
   void SiPMmapping();
-  std::map<Int_t, std::map<Int_t, std::array<float, 2>>> GetSiPMmapU() {
-    return fibresSiPM_U;
+  std::map<Int_t, std::map<Int_t, std::array<float, 2>>> GetSiPMmapU(Int_t iB) {
+    return fibresSiPM_U.at(iB);
   }
-  std::map<Int_t, std::map<Int_t, std::array<float, 2>>> GetFibresMapU() {
-    return siPMFibres_U;
+  std::map<Int_t, std::map<Int_t, std::array<float, 2>>> GetFibresMapU(Int_t iB) {
+    return siPMFibres_U.at(iB);
   }
-  std::map<Int_t, std::map<Int_t, std::array<float, 2>>> GetSiPMmapV() {
-    return fibresSiPM_V;
+  std::map<Int_t, std::map<Int_t, std::array<float, 2>>> GetSiPMmapV(Int_t iB) {
+    return fibresSiPM_V.at(iB);
   }
-  std::map<Int_t, std::map<Int_t, std::array<float, 2>>> GetFibresMapV() {
-    return siPMFibres_V;
+  std::map<Int_t, std::map<Int_t, std::array<float, 2>>> GetFibresMapV(Int_t iB) {
+    return siPMFibres_V.at(iB);
   }
-  std::map<Int_t, float> GetSiPMPos_U() { return SiPMPos_U; }
-  std::map<Int_t, float> GetSiPMPos_V() { return SiPMPos_V; }
-  Int_t Get_NSiPMChan() const { return fNSiPMChan; }
+  std::map<Int_t, float> GetSiPMPos_U(Int_t iB) { return SiPMPos_U.at(iB); }
+  std::map<Int_t, float> GetSiPMPos_V(Int_t iB) { return SiPMPos_V.at(iB); }
+  Int_t Get_NSiPMChan(Int_t iB) const { return fNSiPMChan.at(iB); }
   Float_t Get_SciFiActiveX() const { return fSciFiActiveX; }
-  virtual void SiPMOverlap();
+  /** Number of longitudinal MTC blocks (segments) **/
+  Int_t GetNBlocks() const { return fnB; }
+  /** Number of sandwich layers per block **/
+  Int_t GetNLayersPerBlock() const { return fnLayPerBlock; }
+  /** Map a global layer index (0..fLayers-1) to its block index (0..fnB-1) **/
+  Int_t BlockForLayer(Int_t layer) const {
+    Int_t b = (fnLayPerBlock > 0) ? layer / fnLayPerBlock : 0;
+    return (b < fnB) ? b : fnB - 1;
+  }
+  virtual void SiPMOverlap(Int_t iB);
   Bool_t ProcessHits(FairVolume* vol = nullptr) override;
 
  private:
@@ -83,11 +93,13 @@ class MTCDetector : public SHiP::Detector<MTCDetPoint> {
   Double_t fZCenter;
   Double_t fFieldY;
   Double_t fZEpoxyMat;
-  Double_t fiberMatThick = 0.135;  // 1.35 mm
-  Double_t fFiberLength;
-  Double_t fFiberPitch = 0.025;  // cm
-  Int_t fnB;
-  Int_t fnLayPerBlock;
+  Double_t fiberMatThick = 0.135;      // 1.35 mm
+  std::vector<Double_t> fFiberLength;  //! per-block fibre length
+  Double_t fFiberPitch = 0.025;        // cm
+  Int_t fnB;                           // number of longitudinal blocks
+  Int_t fnLayPerBlock;                 // sandwich layers per block
+  std::vector<Double_t> fBlockWidth;   //! per-block transverse width
+  std::vector<Double_t> fBlockHeight;  //! per-block transverse height
                                  // Define sublayer thicknesses (in cm)
   // These values mimic the GEANT4 setup:
   Double_t lowerIronThick = 0.3;  // 3 mm
@@ -99,26 +111,27 @@ class MTCDetector : public SHiP::Detector<MTCDetPoint> {
   Double_t zFiberMat2 = 1.025 / 10;
   Double_t zUpperIronInt = 3.2 / 10;
   Double_t fFiberRadius = 0.01125;
-  Int_t numFiberLayers = 6;  // number of fiber layers in epoxy block
-  Int_t fNSiPMChan;          // Number of SiPM channels
-  Int_t fChannelAggregated;  // Number of SiPM channels to be aggregated
-  Int_t fNSiPMs = 1;         // Default number of SiPMs
+  Int_t numFiberLayers = 6;        // number of fiber layers in epoxy block
+  std::vector<Int_t> fNSiPMChan;   //! per-block number of SiPM channels
+  Int_t fChannelAggregated;        // Number of SiPM channels to be aggregated
+  std::vector<Int_t> fNSiPMs;      //! per-block number of SiPMs
   static constexpr Int_t kMaxChannelsPerSiPM = 1000;
   // Total module thickness = 0.3 + 0.135 + 0.1 + 0.135 + 0.3 ≈ 1.0 cm
   Int_t fNMats = 1;
-  std::map<Int_t, std::map<Int_t, std::array<float, 2>>>
-      fibresSiPM_U;  //! mapping of fibres to SiPM channels
-  std::map<Int_t, std::map<Int_t, std::array<float, 2>>>
-      siPMFibres_U;  //! inverse mapping
-  std::map<Int_t, std::map<Int_t, std::array<float, 2>>>
-      fibresSiPM_V;  //! mapping of fibres to SiPM channels
-  std::map<Int_t, std::map<Int_t, std::array<float, 2>>>
-      siPMFibres_V;                             //! inverse mapping
-  std::map<Int_t, float> SiPMPos_U, SiPMPos_V;  //! local SiPM channel position
+  std::vector<std::map<Int_t, std::map<Int_t, std::array<float, 2>>>>
+      fibresSiPM_U;  //! per-block mapping of fibres to SiPM channels
+  std::vector<std::map<Int_t, std::map<Int_t, std::array<float, 2>>>>
+      siPMFibres_U;  //! per-block inverse mapping
+  std::vector<std::map<Int_t, std::map<Int_t, std::array<float, 2>>>>
+      fibresSiPM_V;  //! per-block mapping of fibres to SiPM channels
+  std::vector<std::map<Int_t, std::map<Int_t, std::array<float, 2>>>>
+      siPMFibres_V;  //! per-block inverse mapping
+  std::vector<std::map<Int_t, float>>
+      SiPMPos_U, SiPMPos_V;  //! per-block local SiPM channel position
 
   MTCDetector(const MTCDetector&) = delete;
   MTCDetector& operator=(const MTCDetector&) = delete;
-  ClassDefOverride(MTCDetector, 4)
+  ClassDefOverride(MTCDetector, 5)
 };
 
 #endif  // SND_MTC_MTCDETECTOR_H_

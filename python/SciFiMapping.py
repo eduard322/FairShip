@@ -28,6 +28,12 @@ class SciFiMapping:
         """
         self.modules = modules
         self.scifi = modules["MTC"]
+        # The MTC is split longitudinally into fnB blocks (segments) of different
+        # transverse size, each with its own SiPM map. The `*_blocks` attributes
+        # below are lists indexed by block (0..n_blocks-1); the plain attributes
+        # (e.g. fibre_to_simp_map_U) alias block 0 for the drawing utilities.
+        self.n_blocks = self.scifi.GetNBlocks()
+        self.n_layers_per_block = self.scifi.GetNLayersPerBlock()
 
     def create_fibre_to_simp_map(self) -> None:
         """Build mappings from optical fibres to SiPM channels for U and V planes.
@@ -40,23 +46,25 @@ class SciFiMapping:
 
         Side Effects
         ------------
-        Sets attributes 'fibre_to_simp_map_U' and 'fibre_to_simp_map_V'.
+        Sets attributes 'fibre_to_simp_map_U(_blocks)' and 'fibre_to_simp_map_V(_blocks)'.
         """
-        FU, FV = self.scifi.GetSiPMmapU(), self.scifi.GetSiPMmapV()
-        self.fibre_to_simp_map_U, self.fibre_to_simp_map_V = {}, {}
-        for x1, x2 in zip(FU, FV):
-            self.fibre_to_simp_map_U[x1.first] = {}
-            for z in x1.second:
-                self.fibre_to_simp_map_U[x1.first][z.first] = {
-                    "weight": z.second[0],
-                    "xpos": z.second[1],
+        self.fibre_to_simp_map_U_blocks, self.fibre_to_simp_map_V_blocks = [], []
+        for iB in range(self.n_blocks):
+            FU, FV = self.scifi.GetSiPMmapU(iB), self.scifi.GetSiPMmapV(iB)
+            map_u, map_v = {}, {}
+            for x1 in FU:
+                map_u[x1.first] = {
+                    z.first: {"weight": z.second[0], "xpos": z.second[1]} for z in x1.second
                 }
-            self.fibre_to_simp_map_V[x2.first] = {}
-            for z in x2.second:
-                self.fibre_to_simp_map_V[x2.first][z.first] = {
-                    "weight": z.second[0],
-                    "xpos": z.second[1],
+            for x2 in FV:
+                map_v[x2.first] = {
+                    z.first: {"weight": z.second[0], "xpos": z.second[1]} for z in x2.second
                 }
+            self.fibre_to_simp_map_U_blocks.append(map_u)
+            self.fibre_to_simp_map_V_blocks.append(map_v)
+        # Representative (block 0) used by the drawing utilities.
+        self.fibre_to_simp_map_U = self.fibre_to_simp_map_U_blocks[0]
+        self.fibre_to_simp_map_V = self.fibre_to_simp_map_V_blocks[0]
 
     def create_sipm_to_fibre_map(self) -> None:
         """Build mappings from SiPM channels to optical fibres for U and V planes.
@@ -69,23 +77,25 @@ class SciFiMapping:
 
         Side Effects
         ------------
-        Sets attributes 'sipm_to_fibre_map_U' and 'sipm_to_fibre_map_V'.
+        Sets attributes 'sipm_to_fibre_map_U(_blocks)' and 'sipm_to_fibre_map_V(_blocks)'.
         """
-        XU, XV = self.scifi.GetFibresMapU(), self.scifi.GetFibresMapV()
-        self.sipm_to_fibre_map_U, self.sipm_to_fibre_map_V = {}, {}
-        for x1, x2 in zip(XU, XV):
-            self.sipm_to_fibre_map_U[x1.first] = {}
-            for z in x1.second:
-                self.sipm_to_fibre_map_U[x1.first][z.first] = {
-                    "weight": z.second[0],
-                    "xpos": z.second[1],
+        self.sipm_to_fibre_map_U_blocks, self.sipm_to_fibre_map_V_blocks = [], []
+        for iB in range(self.n_blocks):
+            XU, XV = self.scifi.GetFibresMapU(iB), self.scifi.GetFibresMapV(iB)
+            map_u, map_v = {}, {}
+            for x1 in XU:
+                map_u[x1.first] = {
+                    z.first: {"weight": z.second[0], "xpos": z.second[1]} for z in x1.second
                 }
-            self.sipm_to_fibre_map_V[x2.first] = {}
-            for z in x2.second:
-                self.sipm_to_fibre_map_V[x2.first][z.first] = {
-                    "weight": z.second[0],
-                    "xpos": z.second[1],
+            for x2 in XV:
+                map_v[x2.first] = {
+                    z.first: {"weight": z.second[0], "xpos": z.second[1]} for z in x2.second
                 }
+            self.sipm_to_fibre_map_U_blocks.append(map_u)
+            self.sipm_to_fibre_map_V_blocks.append(map_v)
+        # Representative (block 0) used by the drawing utilities.
+        self.sipm_to_fibre_map_U = self.sipm_to_fibre_map_U_blocks[0]
+        self.sipm_to_fibre_map_V = self.sipm_to_fibre_map_V_blocks[0]
 
     def create_sipm_to_position_map(self) -> None:
         """Create a mapping from SiPM channels to their positions in the SciFi detector.
@@ -95,41 +105,43 @@ class SciFiMapping:
 
         Side Effects
         ------------
-        Sets attributes 'sipm_pos_U' and 'sipm_pos_V'.
+        Sets attributes 'sipm_pos_U(_blocks)' and 'sipm_pos_V(_blocks)'.
         """
-        sipm_pos_U_raw = self.scifi.GetSiPMPos_U()
-        sipm_pos_V_raw = self.scifi.GetSiPMPos_V()
-        self.sipm_pos_U, self.sipm_pos_V = {}, {}
-
-        for pair in sipm_pos_U_raw:
-            self.sipm_pos_U[pair.first] = pair.second
-        for pair in sipm_pos_V_raw:
-            self.sipm_pos_V[pair.first] = pair.second
+        self.sipm_pos_U_blocks, self.sipm_pos_V_blocks = [], []
+        for iB in range(self.n_blocks):
+            pos_u = {pair.first: pair.second for pair in self.scifi.GetSiPMPos_U(iB)}
+            pos_v = {pair.first: pair.second for pair in self.scifi.GetSiPMPos_V(iB)}
+            self.sipm_pos_U_blocks.append(pos_u)
+            self.sipm_pos_V_blocks.append(pos_v)
+        # Representative (block 0) used by the drawing utilities.
+        self.sipm_pos_U = self.sipm_pos_U_blocks[0]
+        self.sipm_pos_V = self.sipm_pos_V_blocks[0]
 
     def make_mapping(self) -> None:
         """Execute the full mapping sequence for the SciFi detector.
 
-        Calls internal methods to calculate SiPM overlap, perform the mapping
-        in the SciFi module, and build both fibre-to-SiPM and SiPM-to-fibre maps.
+        Calls internal methods to perform the (per-block) mapping in the SciFi
+        module, and build both fibre-to-SiPM and SiPM-to-fibre maps.
 
         Currently is used in python/shipDigiReco.py.
         """
-        self.scifi.SiPMOverlap()
+        # SiPMmapping loops over blocks and calls SiPMOverlap(iB) internally.
         self.scifi.SiPMmapping()
         self.create_fibre_to_simp_map()
         self.create_sipm_to_fibre_map()
         self.create_sipm_to_position_map()
 
     def get_sipm_to_fibre_map(self):
-        """Retrieve the SiPM-to-fibre mapping dictionaries.
+        """Retrieve the per-block SiPM-to-fibre mappings.
 
         Returns
         -------
-        tuple of dict
-            (sipm_to_fibre_map_U, sipm_to_fibre_map_V)
+        tuple of list of dict
+            (sipm_to_fibre_map_U_blocks, sipm_to_fibre_map_V_blocks), each a list
+            indexed by block (0..n_blocks-1).
 
         """
-        return self.sipm_to_fibre_map_U, self.sipm_to_fibre_map_V
+        return self.sipm_to_fibre_map_U_blocks, self.sipm_to_fibre_map_V_blocks
 
     def get_fibre_to_simp_map(self):
         """Retrieve the fibre-to-SiPM mapping dictionaries.
@@ -142,7 +154,7 @@ class SciFiMapping:
         """
         return self.fibre_to_simp_map_U, self.fibre_to_simp_map_V
 
-    def draw_channel(self, sGeo, channel: int, channel_size: float = 0.1) -> None:
+    def draw_channel(self, sGeo, channel: int, channel_size: float = 0.1, block: int = 0) -> None:
         """Draw a single channel mapping showing fibre positions and the SiPM sensor.
 
         Parameters
@@ -153,17 +165,23 @@ class SciFiMapping:
             Global channel identifier encoding plane type, SiPM unit, and channel index.
         channel_size : float, optional
             SiPM channel width in cm used to size the drawn sensor. Default 0.1.
+        block : int, optional
+            MTC longitudinal block (segment) to draw. Selects the per-block SiPM
+            maps and fibre volume. Default 0.
 
         Side Effects
         ------------
         Saves a PDF file named 'scifi_mapping_channel_1_{channel}.pdf' with the plot.
 
         """
+        # Point the representative maps at the requested block.
+        self.fibre_to_simp_map_U = self.fibre_to_simp_map_U_blocks[block]
+        self.fibre_to_simp_map_V = self.fibre_to_simp_map_V_blocks[block]
         AF = ROOT.TVector3()
         BF = ROOT.TVector3()
         plane_type = int(channel / 1e5) % 10
         locChannel = channel % 1000000
-        fibreVol = sGeo.FindVolumeFast("FiberVol")
+        fibreVol = sGeo.FindVolumeFast(f"FiberVol_{block}")
         R = fibreVol.GetShape().GetDX()
         DX = channel_size / 2
         DZ = 0.135
@@ -234,6 +252,7 @@ class SciFiMapping:
         dpi=300,
         cmap_name="tab20",
         alpha_fibre=0.4,
+        block=0,
     ) -> None:
         """Draw overlay plot of multiple channel mappings on a single figure.
 
@@ -259,6 +278,9 @@ class SciFiMapping:
             Matplotlib colormap name for differentiating channels. Default is 'tab20'.
         alpha_fibre : float, optional
             Transparency for fibre ellipses. Default is 0.4.
+        block : int, optional
+            MTC longitudinal block (segment) to draw. Selects the per-block SiPM
+            maps and fibre volume. Default 0.
 
         Side Effects
         ------------
@@ -805,17 +827,17 @@ class SciFiMapping:
         plt.savefig(output_file)
         plt.close(fig)
 
-    def mapping_validation(self) -> None:
+    def mapping_validation(self, block: int = 0) -> None:
         """Validate and print the SiPM-to-fibre and fibre-to-SiPM mappings.
 
-        Prints out the mappings for the U plane, showing fibre indices,
-        SiPM channels, weights, and x-positions for both mapping directions.
+        Prints out the mappings for the U plane of the given block, showing fibre
+        indices, SiPM channels, weights, and x-positions for both directions.
 
         """
-        sipm_to_fiber_map_U, _ = self.get_sipm_to_fibre_map()
+        sipm_to_fiber_map_U = self.get_sipm_to_fibre_map()[0][block]
         fiber_to_sipm_map_U, _ = self.get_fibre_to_simp_map()
 
-        print("Validating U plane mapping:")
+        print(f"Validating U plane mapping (block {block}):")
         for fiber_id, fibers in sipm_to_fiber_map_U.items():
             for sipm_chan, chan_info in fibers.items():
                 weight = chan_info["weight"]
