@@ -136,11 +136,11 @@ TGeoVolume* SiWCalo::CreateSiliconPlanes(const char* name, Double_t width,
   // ------------------------------------------------------------
   // Pixel segmentation: X then Y
   // ------------------------------------------------------------
-  auto* XCells = SensorVolume->Divide("PIXELX",
+  auto* XCells = SensorVolume->Divide("PIXEL_X",
                                       1,  // X axis
                                       nPixX, -width / 2.0, pixX);
 
-  auto* Pixels = XCells->Divide("PIXELY",
+  auto* Pixels = XCells->Divide("PIXEL_Y",
                                 2,  // Y axis
                                 nPixY, -length / 2.0, pixY);
 

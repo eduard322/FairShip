@@ -71,8 +71,8 @@ void ShipMuonShield::CreateArb8(const TString& arbName, TGeoMedium* medium,
 
   LOG(debug) << " Create CreateArb8 of the MS ";
 
-  TString magnLast = Form("Magn%zu", nMagnets - 1);
-  TString magnPrev = Form("Magn%zu", nMagnets - 2);
+  TString magnLast = Form("Magn%zu", nMagnets - 2);
+  TString magnPrev = Form("Magn%zu", nMagnets - 3);
 
   bool snd_magnet = (arbName == magnLast + "_MiddleMagL") ||
                     (arbName == magnLast + "_MiddleMagR") ||

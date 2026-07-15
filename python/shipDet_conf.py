@@ -131,7 +131,7 @@ def configure_snd_mtc(yaml_file: str, ship_geo) -> None:
         mtc_total_length = (
             ship_geo.mtc_geo.ironThick + ship_geo.mtc_geo.sciFiThick + ship_geo.mtc_geo.scintThick
         ) * ship_geo.mtc_geo.nLayers
-        ship_geo.mtc_geo.zPosition = ship_geo.muShield.Entrance[-1] + mtc_total_length / 2
+        ship_geo.mtc_geo.zPosition = ship_geo.muShield.Entrance[-2] + mtc_total_length / 2
     mtc = ROOT.MTCDetector("MTC", ROOT.kTRUE)
     mtc.SetMTCParameters(
         ship_geo.mtc_geo.width,
@@ -172,8 +172,8 @@ def configure_snd_siliconTarget(yaml_file: str, ship_geo) -> None:
         else:
             SiWCalo_total_length = 0.0
         ship_geo.SiliconTarget_geo.zPosition = (
-            ship_geo.muShield.Entrance[-1]
-            - ship_geo.muShield.Zgap[-1]
+            ship_geo.muShield.Entrance[-2]
+            - ship_geo.muShield.Zgap[-2]
             - SiWCalo_total_length
             - SiliconTarget_total_length / 2
         )
