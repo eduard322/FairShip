@@ -53,12 +53,24 @@ ShipMuonShield::ShipMuonShield(std::vector<double> in_params, Double_t z,
   z_end_of_proximity_shielding = z;
 }
 
-void ShipMuonShield::SetSNDSpace(Bool_t hole, Double_t hole_dx,
-                                 Double_t hole_dy) {
+void ShipMuonShield::SetSNDSpace(Bool_t hole, Bool_t fillIron,
+                                 const SNDDimensions& dimensions) {
   snd_hole = hole;
-  snd_hole_dx = hole_dx / 2.;  // since the hole is cut in 2 halves, we need to
-                               // divide the width by 2
-  snd_hole_dy = hole_dy;
+  fill_iron = fillIron;
+  snd_dimensions = dimensions;
+  if (!fill_iron) {
+    // Legacy full-length hole must clear the largest SND subdetector
+    // (plus 5 cm clearance). The hole is cut in 2 halves (one per
+    // middle-magnet side), so each void box gets a quarter of the full
+    // width and half of the full height as its half-dimensions.
+    for (const auto& [name, dims] : dimensions) {
+      snd_hole_dx = std::max(snd_hole_dx, (dims.at("dx") + 5. * cm) / 4.);
+      snd_hole_dy = std::max(snd_hole_dy, (dims.at("dy") + 5. * cm) / 2.);
+      LOG(debug) << "SND space " << name << ": dx=" << dims.at("dx")
+                 << ", dy=" << dims.at("dy") << ", z_pos=" << dims.at("z_pos")
+                 << ", length=" << dims.at("length");
+    }
+  }
 }
 
 void ShipMuonShield::CreateArb8(const TString& arbName, TGeoMedium* medium,
@@ -86,35 +98,58 @@ void ShipMuonShield::CreateArb8(const TString& arbName, TGeoMedium* medium,
     TString shapeName = arbName + "_shape";
     gGeoManager->MakeArb8(shapeName, medium, dZ, corners.data());
 
-    //
-    // 2) Void box that’s 0.1 mm smaller on each half-length
-    //
-    constexpr double eps = 0.01;  // mm anti-overlap
-    double void_dx = snd_hole_dx - eps;
-    double void_dy = snd_hole_dy - eps;
-    TString voidName = arbName + "_void";
-    gGeoManager->MakeBox(voidName, medium, void_dx, void_dy, dZ);
+    // Composite expression: <shape> minus one translated void per cut
+    TString expr = shapeName;
+
+    if (fill_iron) {
+      //
+      // 2a) Subsystem-aware voids: one box per SND subdetector, limited in
+      //     z to where the subdetector actually sits; the rest of the
+      //     magnet stays filled with iron. The hole is cut in 2 halves
+      //     (one per middle-magnet side), so each void box gets a quarter
+      //     of the full width and half of the full height/length as its
+      //     half-dimensions.
+      //
+
+      for (const auto& [name, dims] : snd_dimensions) {
+        double anti_overlap = 5. * mm;  // mm anti-overlap
+        double void_dx = dims.at("dx") / 4. + anti_overlap;
+        double void_dy = dims.at("dy") / 2. + anti_overlap;
+        double void_dz = dims.at("length") / 2. + anti_overlap;
+        TString voidName = arbName + "_" + name.c_str() + "_void";
+        gGeoManager->MakeBox(voidName, medium, void_dx, void_dy, void_dz);
+        Double_t shift = (corners[1] > 0 ? -void_dx : void_dx);
+        TString transName = arbName + "_" + name.c_str() + "_t";
+        // z_pos is global; the subtraction acts in the magnet's local
+        // frame, i.e. before the shift by z_translation
+        auto* tr = new TGeoTranslation(transName.Data(), shift, 0.0,
+                                       dims.at("z_pos") - z_translation);
+        tr->RegisterYourself();
+        expr += TString::Format(" - %s:%s", voidName.Data(), transName.Data());
+      }
+    } else {
+      //
+      // 2b) Legacy void: a single box running the full magnet length,
+      //     sized in SetSNDSpace to clear the largest SND subdetector
+      //
+      constexpr double eps = 0.01;  // mm anti-overlap
+      double void_dx = snd_hole_dx - eps;
+      double void_dy = snd_hole_dy - eps;
+      TString voidName = arbName + "_void";
+      gGeoManager->MakeBox(voidName, medium, void_dx, void_dy, dZ);
+      Double_t shift = (corners[1] > 0 ? -void_dx : void_dx);
+      TString transName = arbName + "_t";
+      auto* tr = new TGeoTranslation(transName.Data(), shift, 0.0, 0.0);
+      tr->RegisterYourself();
+      expr += TString::Format(" - %s:%s", voidName.Data(), transName.Data());
+    }
 
     //
-    // 3) Single named translation for the subtraction
-    //
-    Double_t shift = (corners[1] > 0 ? -void_dx : void_dx);
-    TString transName = arbName + "_t";
-    auto* tr = new TGeoTranslation(transName.Data(), shift, 0.0, 0.0);
-    tr->RegisterYourself();
-
-    //
-    // 4) Composite shape: <shape> minus the translated <void>
+    // 3) Composite shape: <shape> minus the translated void(s),
+    //    wrapped in a volume
     //
     TString compName = arbName + "_comp";
-    TString expr = TString::Format("%s - %s:%s", shapeName.Data(),
-                                   voidName.Data(), transName.Data());
     auto* compShape = new TGeoCompositeShape(compName.Data(), expr.Data());
-
-    //
-    // 5) Wrap the composite in a volume
-    //
-    LOG(debug) << " Create CreateArb8 of the MS 5";
     magVol = new TGeoVolume(arbName, compShape, medium);
   } else {
     // original uncut magnet

@@ -6,6 +6,8 @@
 #define PASSIVE_SHIPMUONSHIELD_H_
 
 #include <array>
+#include <map>
+#include <string>
 #include <vector>
 
 #include "FairLogger.h"
@@ -21,12 +23,16 @@ enum class FieldDirection : bool { up, down };
 
 class ShipMuonShield : public FairModule {
  public:
+  /// Per-subdetector SND dimensions: {name: {"dx", "dy", "z_pos", "length"}}
+  using SNDDimensions = std::map<std::string, std::map<std::string, Double_t>>;
+
   ShipMuonShield(std::vector<double> in_params, Double_t z,
                  const Bool_t WithConstShieldField, const Bool_t SC_key);
   ShipMuonShield();
   ~ShipMuonShield() override;
   void ConstructGeometry() override;
-  void SetSNDSpace(Bool_t hole, Double_t hole_dx, Double_t hole_dy);
+  void SetSNDSpace(Bool_t hole, Bool_t fillIron,
+                   const SNDDimensions& snd_dimensions);
 
  protected:
   Double_t dZ0{0.}, dZ1{0.}, dZ2{0.}, dZ3{0.}, dZ4{0.}, dZ5{0.}, dZ6{0.},
@@ -37,6 +43,8 @@ class ShipMuonShield : public FairModule {
   Bool_t fSC_mag{false};
   std::vector<Double_t> shield_params;
   Bool_t snd_hole{false};
+  Bool_t fill_iron{true};
+  SNDDimensions snd_dimensions{};
   Double_t snd_hole_dx = 0., snd_hole_dy = 0.;
 
   void CreateArb8(const TString& arbName, TGeoMedium* medium, Double_t dZ,

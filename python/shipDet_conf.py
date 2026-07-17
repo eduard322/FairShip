@@ -128,10 +128,10 @@ def configure_snd_mtc(yaml_file: str, ship_geo) -> None:
     # Initialize detector
     if ship_geo.mtc_geo.zPosition == "auto":
         # Get the the center of the *last* magnet
-        mtc_total_length = (
+        ship_geo.mtc_geo.mtc_total_length = (
             ship_geo.mtc_geo.ironThick + ship_geo.mtc_geo.sciFiThick + ship_geo.mtc_geo.scintThick
         ) * ship_geo.mtc_geo.nLayers
-        ship_geo.mtc_geo.zPosition = ship_geo.muShield.Entrance[-2] + mtc_total_length / 2
+        ship_geo.mtc_geo.zPosition = ship_geo.muShield.Entrance[-2] + ship_geo.mtc_geo.mtc_total_length / 2
     mtc = ROOT.MTCDetector("MTC", ROOT.kTRUE)
     mtc.SetMTCParameters(
         ship_geo.mtc_geo.width,
@@ -160,7 +160,7 @@ def configure_snd_siliconTarget(yaml_file: str, ship_geo) -> None:
         # last muon-shield gap. In Design 3 the SiWCalo sits between that anchor
         # and the SiliconTarget, so the target is pushed further upstream by the
         # full SiWCalo length; Design 2 has no SiWCalo and applies no such offset.
-        SiliconTarget_total_length = ship_geo.SiliconTarget_geo.targetSpacing * ship_geo.SiliconTarget_geo.nLayers
+        ship_geo.SiliconTarget_geo.SiliconTarget_total_length = ship_geo.SiliconTarget_geo.targetSpacing * ship_geo.SiliconTarget_geo.nLayers
         if 3 in getattr(ship_geo, "SND_design", []):
             # SiWCalo is configured after SiliconTarget, so its length isn't in
             # ship_geo yet — read it from the sibling config file into a local
@@ -175,7 +175,7 @@ def configure_snd_siliconTarget(yaml_file: str, ship_geo) -> None:
             ship_geo.muShield.Entrance[-2]
             - ship_geo.muShield.Zgap[-2]
             - SiWCalo_total_length
-            - SiliconTarget_total_length / 2
+            - ship_geo.SiliconTarget_geo.SiliconTarget_total_length / 2
         )
         print("SiliconTarget zPosition set to ", ship_geo.SiliconTarget_geo.zPosition)
     SiliconTarget = ROOT.SiliconTarget("SiliconTarget", ROOT.kTRUE)
@@ -200,6 +200,7 @@ def configure_snd_SiWCalo(yaml_file: str, ship_geo) -> None:
     # ship_geo.SiliconTarget_geo is already populated (with its resolved
     # zPosition) by configure_snd_siliconTarget, which runs first in the dispatch.
     # Initialize detector
+    ship_geo.SiWCalo_geo.SiWCalo_total_length = ship_geo.SiWCalo_geo.targetSpacing * ship_geo.SiWCalo_geo.nLayers
     if ship_geo.SiWCalo_geo.zPosition == "auto":
         # Just a bit after the SiW strip detector
         z_shift_prev = 0.5 * (ship_geo.SiliconTarget_geo.nLayers * ship_geo.SiliconTarget_geo.targetSpacing)
@@ -390,10 +391,31 @@ def configure(run, ship_geo):
     if ship_geo.SND:
         # set SNDSpace for MuonShield for any design containing MTC (2 or 3)
         if any(x in getattr(ship_geo, "SND_design", []) for x in (2, 3)):
+            snd_dimensions = {
+                "MTC": {
+                    "dx": ship_geo.mtc_geo.width,
+                    "dy": ship_geo.mtc_geo.height,
+                    "z_pos": ship_geo.mtc_geo.zPosition,
+                    "length": ship_geo.mtc_geo.mtc_total_length
+                },
+                "SiTarget": {
+                    "dx": ship_geo.SiliconTarget_geo.targetWidth,
+                    "dy": ship_geo.SiliconTarget_geo.targetHeight,
+                    "z_pos": ship_geo.SiliconTarget_geo.zPosition,
+                    "length": ship_geo.SiliconTarget_geo.SiliconTarget_total_length
+                }
+            }
+            if 3 in ship_geo.SND_design:
+                snd_dimensions["SiWCalo"] = {
+                    "dx": ship_geo.SiWCalo_geo.targetWidth,
+                    "dy": ship_geo.SiWCalo_geo.targetHeight,
+                    "z_pos": ship_geo.SiWCalo_geo.zPosition,
+                    "length": ship_geo.SiWCalo_geo.SiWCalo_total_length
+                }
             MuonShield.SetSNDSpace(
                 hole=True,
-                hole_dx=(ship_geo.mtc_geo.width + 5.0 * u.cm) / 2.0,
-                hole_dy=(ship_geo.mtc_geo.height + 5.0 * u.cm) / 2.0,
+                fillIron=True,  # False: legacy full-length hole
+                snd_dimensions=snd_dimensions,
             )
     detectorList.append(MuonShield)
 
