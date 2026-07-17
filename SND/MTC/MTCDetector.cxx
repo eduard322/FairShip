@@ -346,20 +346,38 @@ void MTCDetector::ConstructGeometry() {
   //  n // 3 layers with 40x60, n // 3 layers with 50x60, n // 3 layers with
   //  60x60
   // Fixed by the Muon Shield construction
-  TGeoBBox* ironBoxes[fnB];
-  TGeoVolume* ironVols[fnB];
+  // Each block is a full-width (60x60) iron slab that fills the Muon Shield
+  // aperture. The magnetized region only spans ironPlateSizes[i] (40/50/60): for
+  // the narrower blocks a field-carrying insert is nested inside the slab, so
+  // the iron is physically continuous while the field is confined to the strip.
+  TGeoVolume* ironFull[fnB];
   for (int i{0}; i < fnB; i++) {
-    std::string iron_label = Form("MTC_iron_%d", i);
-    ironBoxes[i] = new TGeoBBox(iron_label.c_str(), ironPlateSizes[i] / 2,
-                                fHeight / 2, fIronThick / 2);
-    ironVols[i] = new TGeoVolume(iron_label.c_str(), ironBoxes[i], ironMed);
-    ironVols[i]->SetLineColor(kGray + 1);
-    ironVols[i]->SetTransparency(20);
-    // Enable the field in the iron volume
-    if (fFieldY != 0)
-      ironVols[i]->SetField(new TGeoUniformMagField(0, fFieldY, 0));
-  }
+    std::string full_label = Form("MTC_iron_full_%d", i);
+    auto* fullBox = new TGeoBBox(full_label.c_str(), fWidth / 2, fHeight / 2,
+                                 fIronThick / 2);
+    ironFull[i] = new TGeoVolume(full_label.c_str(), fullBox, ironMed);
+    ironFull[i]->SetLineColor(kGray + 1);
+    ironFull[i]->SetTransparency(20);
 
+    if (ironPlateSizes[i] >= fWidth) {
+      // Whole slab is magnetized: assign the field to the full slab directly
+      // (a nested insert would be degenerate with the mother).
+      if (fFieldY != 0)
+        ironFull[i]->SetField(new TGeoUniformMagField(0, fFieldY, 0));
+    } else {
+      // Nest the magnetized insert inside the full slab (mother-daughter
+      // containment).
+      std::string iron_label = Form("MTC_iron_%d", i);
+      auto* ironBox = new TGeoBBox(iron_label.c_str(), ironPlateSizes[i] / 2,
+                                   fHeight / 2, fIronThick / 2);
+      auto* ironVol = new TGeoVolume(iron_label.c_str(), ironBox, ironMed);
+      ironVol->SetLineColor(kGray + 1);
+      ironVol->SetTransparency(20);
+      if (fFieldY != 0)
+        ironVol->SetField(new TGeoUniformMagField(0, fFieldY, 0));
+      ironFull[i]->AddNode(ironVol, 0, new TGeoTranslation(0, 0, 0));
+    }
+  }
   // --- Assemble the layers into the envelope ---
   TGeoVolumeAssembly* sensitiveModule = new TGeoVolumeAssembly("MTC_layer");
   // Define a layer for the SciFi module
@@ -375,7 +393,7 @@ void MTCDetector::ConstructGeometry() {
     // Place the Outer Iron layer (shifted down by half the SciFi+scint
     // thickness)
     int blockNumber = BlockForLayer(i);
-    envVol->AddNode(ironVols[blockNumber], i,
+    envVol->AddNode(ironFull[blockNumber], i,
                     new TGeoTranslation(0, 0, zPos + fIronThick / 2));
     // Place the sensitive module (SciFi + Scintillator) at the correct z
     // position
