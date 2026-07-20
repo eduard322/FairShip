@@ -347,9 +347,10 @@ void MTCDetector::ConstructGeometry() {
   //  60x60
   // Fixed by the Muon Shield construction
   // Each block is a full-width (60x60) iron slab that fills the Muon Shield
-  // aperture. The magnetized region only spans ironPlateSizes[i] (40/50/60): for
-  // the narrower blocks a field-carrying insert is nested inside the slab, so
-  // the iron is physically continuous while the field is confined to the strip.
+  // aperture. The magnetized region only spans ironPlateSizes[i] (40/50/60):
+  // for the narrower blocks a field-carrying insert is nested inside the slab,
+  // so the iron is physically continuous while the field is confined to the
+  // strip.
   TGeoVolume* ironFull[fnB];
   for (int i{0}; i < fnB; i++) {
     std::string full_label = Form("MTC_iron_full_%d", i);

@@ -160,7 +160,9 @@ def configure_snd_siliconTarget(yaml_file: str, ship_geo) -> None:
         # last muon-shield gap. In Design 3 the SiWCalo sits between that anchor
         # and the SiliconTarget, so the target is pushed further upstream by the
         # full SiWCalo length; Design 2 has no SiWCalo and applies no such offset.
-        ship_geo.SiliconTarget_geo.SiliconTarget_total_length = ship_geo.SiliconTarget_geo.targetSpacing * ship_geo.SiliconTarget_geo.nLayers
+        ship_geo.SiliconTarget_geo.SiliconTarget_total_length = (
+            ship_geo.SiliconTarget_geo.targetSpacing * ship_geo.SiliconTarget_geo.nLayers
+        )
         if 3 in getattr(ship_geo, "SND_design", []):
             # SiWCalo is configured after SiliconTarget, so its length isn't in
             # ship_geo yet — read it from the sibling config file into a local
@@ -396,21 +398,21 @@ def configure(run, ship_geo):
                     "dx": ship_geo.mtc_geo.width,
                     "dy": ship_geo.mtc_geo.height,
                     "z_pos": ship_geo.mtc_geo.zPosition,
-                    "length": ship_geo.mtc_geo.mtc_total_length
+                    "length": ship_geo.mtc_geo.mtc_total_length,
                 },
                 "SiTarget": {
                     "dx": ship_geo.SiliconTarget_geo.targetWidth,
                     "dy": ship_geo.SiliconTarget_geo.targetHeight,
                     "z_pos": ship_geo.SiliconTarget_geo.zPosition,
-                    "length": ship_geo.SiliconTarget_geo.SiliconTarget_total_length
-                }
+                    "length": ship_geo.SiliconTarget_geo.SiliconTarget_total_length,
+                },
             }
             if 3 in ship_geo.SND_design:
                 snd_dimensions["SiWCalo"] = {
                     "dx": ship_geo.SiWCalo_geo.targetWidth,
                     "dy": ship_geo.SiWCalo_geo.targetHeight,
                     "z_pos": ship_geo.SiWCalo_geo.zPosition,
-                    "length": ship_geo.SiWCalo_geo.SiWCalo_total_length
+                    "length": ship_geo.SiWCalo_geo.SiWCalo_total_length,
                 }
             MuonShield.SetSNDSpace(
                 hole=True,

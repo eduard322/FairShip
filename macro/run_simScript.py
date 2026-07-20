@@ -325,8 +325,8 @@ parser.add_argument("-D", "--display", dest="eventDisplay", help="store trajecto
 parser.add_argument(
     "--shieldName",
     help="The name of the muon shield in the database to use.",
-    default="TRY_2026",
-    choices=["TRY_2025", "TRY_2026"],
+    default="TRY_2026_no_MTC_field.root",
+    choices=["TRY_2025", "TRY_2026", "TRY6_no_MTC_field.root"],
 )
 parser.add_argument(
     "--MesonMother", dest="MM", help="Choose DP production meson source: pi0, eta, omega, eta1, eta11", default="pi0"
