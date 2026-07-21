@@ -9,3 +9,8 @@ SiWCalo:
   NPixels: 96 # 32*3 because it's 3x3 ASUSs
   targetSpacing: 2.54 #Spacing between pairs of tungsten layers (cm)
   moduleOffset: 0.1 #Spacing between tungsten surface and first silicon layer (cm)
+  mtcGap: 1.0 # Design 4 only: gap (cm) between SiWCalo downstream face and MTC upstream face
+  copperPlates: # Design 4 only: passive Cu plates above/below SiWCalo filling the Magn5-Magn6 gap
+    enabled: true
+    width: 54 # full x width (cm), matches SiWCalo targetWidth
+    thickness: 10 # y thickness (cm) per plate
