@@ -9,4 +9,4 @@ MTC:
   scint_cell_size: 5 # Scintillator tile cell size (cm)
   nLayers: 42 # Number of sandwich layers
   zPosition: auto # Default: auto -- center of the last magnet or global z position in cm
-  fieldY: -1.9 # Magnetic field strength (tesla)
+  fieldY: -19 # Magnetic field strength (tesla)

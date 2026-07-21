@@ -53,6 +53,7 @@ cxx-compiler = "*"
 
 # Static analysis
 clang-tools = "*"  # provides clang-tidy
+genie = ">=3.6.2,<4"
 
 [pypi-dependencies]
 pyrefly = "*"

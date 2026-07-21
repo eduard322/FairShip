@@ -364,7 +364,7 @@ void MTCDetector::ConstructGeometry() {
       // Whole slab is magnetized: assign the field to the full slab directly
       // (a nested insert would be degenerate with the mother).
       if (fFieldY != 0)
-        ironFull[i]->SetField(new TGeoUniformMagField(0, fFieldY, 0));
+        ironFull[i]->SetField(new TGeoUniformMagField(0, fFieldY * ShipUnit::tesla, 0));
     } else {
       // Nest the magnetized insert inside the full slab (mother-daughter
       // containment).
@@ -375,7 +375,7 @@ void MTCDetector::ConstructGeometry() {
       ironVol->SetLineColor(kGray + 1);
       ironVol->SetTransparency(20);
       if (fFieldY != 0)
-        ironVol->SetField(new TGeoUniformMagField(0, fFieldY, 0));
+        ironVol->SetField(new TGeoUniformMagField(0, fFieldY * ShipUnit::tesla, 0));
       ironFull[i]->AddNode(ironVol, 0, new TGeoTranslation(0, 0, 0));
     }
   }
