@@ -97,13 +97,13 @@ class MTCDetector : public SHiP::Detector<MTCDetPoint> {
   static constexpr Double_t lowerIronThick = 0.3;  // 3 mm
   static constexpr Double_t upperIronThick = 0.3;  // 3 mm
   // Internal SciFi stack z-positions, symmetric about the module-local origin
-  // so the 0.97 cm stack spans [-0.485, +0.485]. The former values carried a
+  // so the 1.0 cm stack spans [-0.485, +0.485]. The former values carried a
   // common -0.15 mm datum offset that pushed the lowerIron 0.015 cm into the
   // outer iron plate below (overlap) and left an equal gap to the scint above.
-  static constexpr Double_t zLowerIronInt = -3.35 / 10;
-  static constexpr Double_t zFiberMat1 = -1.175 / 10;
-  static constexpr Double_t zFiberMat2 = 1.175 / 10;
-  static constexpr Double_t zUpperIronInt = 3.35 / 10;
+  static constexpr Double_t zLowerIronInt = -3.50 / 10;
+  static constexpr Double_t zFiberMat1 = -1.325 / 10;
+  static constexpr Double_t zFiberMat2 = 1.325 / 10;
+  static constexpr Double_t zUpperIronInt = 3.50 / 10;
   static constexpr Double_t fFiberRadius = 0.01125;
   static constexpr Int_t numFiberLayers =
       6;                           // number of fiber layers in epoxy block
@@ -115,7 +115,7 @@ class MTCDetector : public SHiP::Detector<MTCDetPoint> {
   static constexpr Double_t ironPlateSizes[fnB] = {
       40., 50., 60.};  // strictly fixed by the Muon Shield Design
   static constexpr Int_t kMaxChannelsPerSiPM = 1000;
-  // Total module thickness = 0.3 + 0.135 + 0.1 + 0.135 + 0.3 ≈ 1.0 cm
+  // Total module thickness = 0.3 + 0.135 + 0.13 + 0.135 + 0.3 = 1.0 cm
   Int_t fNMats = 1;  // left for the detailed description
   std::map<Int_t, std::map<Int_t, std::array<float, 2>>>
       fibresSiPM_U;  //! mapping of fibres to SiPM channels

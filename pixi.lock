@@ -15,6 +15,8 @@ environments:
     - https://pypi.org/simple
     packages:
       linux-64:
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/lhapdf-6.5.6-py313hc8edb43_2.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/log4cpp-1.1.4-h59595ed_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/faircmakemodules-1.0.0-h98f672e_0.conda
       - conda: https://prefix.dev/conda-forge/linux-64/_openmp_mutex-4.5-7_kmp_llvm.conda
       - conda: https://prefix.dev/conda-forge/linux-64/alsa-lib-1.2.16.1-hb03c661_0.conda
@@ -414,8 +416,10 @@ environments:
       - conda: https://prefix.dev/ship/linux-64/fairroot-19.0.1-h6afcf60_12.conda
       - conda: https://prefix.dev/ship/linux-64/geant3-4.5-h6afcf60_7.conda
       - conda: https://prefix.dev/ship/linux-64/genfit-2.3.0-h6afcf60_10.conda
+      - conda: https://prefix.dev/ship/linux-64/genie-3.06.02-pythia6_6578b0d_2.conda
       - conda: https://prefix.dev/ship/linux-64/pythia6-6.4.28-hb0f4dca_6.conda
       - conda: https://prefix.dev/ship/linux-64/rootegpythia6-0.1-hc97bc57_9.conda
+      - conda: https://prefix.dev/ship/noarch/genie-data-3.06.02-h4616a5c_0.conda
       - conda: https://prefix.dev/ship/noarch/ship-ci-metrics-0.1.0-pyh4616a5c_0.conda
       - pypi: https://files.pythonhosted.org/packages/b6/e7/30e085b31fed978ecb675bdbb54df566673ab550469e5af2d350f6af0be6/pyrefly-1.1.1-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
   lint:
@@ -426,6 +430,8 @@ environments:
     - https://pypi.org/simple
     packages:
       linux-64:
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/lhapdf-6.5.6-py313hc8edb43_2.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/log4cpp-1.1.4-h59595ed_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/faircmakemodules-1.0.0-h98f672e_0.conda
       - conda: https://prefix.dev/conda-forge/linux-64/_openmp_mutex-4.5-7_kmp_llvm.conda
       - conda: https://prefix.dev/conda-forge/linux-64/alsa-lib-1.2.16.1-hb03c661_0.conda
@@ -839,8 +845,10 @@ environments:
       - conda: https://prefix.dev/ship/linux-64/fairroot-19.0.1-h6afcf60_12.conda
       - conda: https://prefix.dev/ship/linux-64/geant3-4.5-h6afcf60_7.conda
       - conda: https://prefix.dev/ship/linux-64/genfit-2.3.0-h6afcf60_10.conda
+      - conda: https://prefix.dev/ship/linux-64/genie-3.06.02-pythia6_6578b0d_2.conda
       - conda: https://prefix.dev/ship/linux-64/pythia6-6.4.28-hb0f4dca_6.conda
       - conda: https://prefix.dev/ship/linux-64/rootegpythia6-0.1-hc97bc57_9.conda
+      - conda: https://prefix.dev/ship/noarch/genie-data-3.06.02-h4616a5c_0.conda
       - conda: https://prefix.dev/ship/noarch/ship-ci-metrics-0.1.0-pyh4616a5c_0.conda
       - pypi: https://files.pythonhosted.org/packages/06/a2/c01db32be2ae7d6a1689972f3c492b149ee4e164b12fdfd9f64b50888215/types_pyyaml-6.0.12.20260518-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/62/c1/c455be45ee4d3a886d2353d8c6af5071536d35fee7adf2c4fdf56713fbf9/gersemi-0.27.7-cp313-cp313-manylinux_2_28_x86_64.whl
@@ -849,6 +857,36 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/b6/e7/30e085b31fed978ecb675bdbb54df566673ab550469e5af2d350f6af0be6/pyrefly-1.1.1-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/d2/a8/84baf48e05b603480b963f655e73b97230f7296433d3cc8206b742c167fd/ignore_python-0.3.3-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
 packages:
+- conda: https://conda.anaconda.org/conda-forge/linux-64/lhapdf-6.5.6-py313hc8edb43_2.conda
+  sha256: 8a506caa0cdace6c18dd15da107139c775da1d7836d59fc5de7b64a819cf8886
+  md5: 2b6ef4d00e7f91a260c1c73874181b0b
+  depends:
+  - python
+  - libstdcxx >=14
+  - libgcc >=14
+  - __glibc >=2.17,<3.0.a0
+  - python_abi 3.13.* *_cp313
+  license: GPL-3.0-only
+  license_family: GPL
+  purls: []
+  run_exports:
+    weak:
+    - lhapdf >=6.5.6,<6.6.0a0
+  size: 668216
+  timestamp: 1775783127262
+- conda: https://conda.anaconda.org/conda-forge/linux-64/log4cpp-1.1.4-h59595ed_0.conda
+  sha256: 4814e99a638b4096514a5383f205168d8bed134afd263af4a34e4f0698b86aa1
+  md5: 934480e7e97803f9a9da14b286456601
+  depends:
+  - libgcc-ng >=12
+  - libstdcxx-ng >=12
+  license: LGPL-2.1-or-later
+  purls: []
+  run_exports:
+    weak:
+    - log4cpp >=1.1.4,<1.2.0a0
+  size: 145540
+  timestamp: 1683643099216
 - conda: https://conda.anaconda.org/conda-forge/noarch/faircmakemodules-1.0.0-h98f672e_0.conda
   sha256: 2634b440823429b61cde095e1b0135aace6302238ab783049cac92c6922e4bcb
   md5: a0719b28c2a63aa871a65bfc7091ff7c
@@ -1160,7 +1198,7 @@ packages:
   license: MIT
   license_family: MIT
   purls:
-  - pkg:pypi/cffi?source=hash-mapping
+  - pkg:pypi/cffi?source=compressed-mapping
   run_exports: {}
   size: 304647
   timestamp: 1783424174920
@@ -1558,7 +1596,7 @@ packages:
   license: MIT
   license_family: MIT
   purls:
-  - pkg:pypi/debugpy?source=compressed-mapping
+  - pkg:pypi/debugpy?source=hash-mapping
   run_exports: {}
   size: 2825625
   timestamp: 1780390153372
@@ -3929,7 +3967,7 @@ packages:
   license: BSD-3-Clause
   license_family: BSD
   purls:
-  - pkg:pypi/numpy?source=compressed-mapping
+  - pkg:pypi/numpy?source=hash-mapping
   run_exports:
     weak:
     - numpy >=1.23,<3
@@ -4040,7 +4078,7 @@ packages:
   license: BSD-3-Clause
   license_family: BSD
   purls:
-  - pkg:pypi/pandas?source=hash-mapping
+  - pkg:pypi/pandas?source=compressed-mapping
   run_exports: {}
   size: 15001668
   timestamp: 1778602610159
@@ -5589,7 +5627,7 @@ packages:
   license: MIT
   license_family: MIT
   purls:
-  - pkg:pypi/beautifulsoup4?source=hash-mapping
+  - pkg:pypi/beautifulsoup4?source=compressed-mapping
   run_exports: {}
   size: 92704
   timestamp: 1780853175566
@@ -5617,7 +5655,7 @@ packages:
   - tinycss2 >=1.1.0,<1.5
   license: Apache-2.0 AND MIT
   purls:
-  - pkg:pypi/bleach?source=compressed-mapping
+  - pkg:pypi/bleach?source=hash-mapping
   run_exports: {}
   size: 142246
   timestamp: 1780675823953
@@ -6280,7 +6318,7 @@ packages:
   license: BSD-3-Clause
   license_family: BSD
   purls:
-  - pkg:pypi/ipykernel?source=compressed-mapping
+  - pkg:pypi/ipykernel?source=hash-mapping
   run_exports: {}
   size: 138635
   timestamp: 1781101665847
@@ -6407,7 +6445,7 @@ packages:
   license: Apache-2.0
   license_family: APACHE
   purls:
-  - pkg:pypi/json5?source=hash-mapping
+  - pkg:pypi/json5?source=compressed-mapping
   run_exports: {}
   size: 39373
   timestamp: 1781926894833
@@ -6558,7 +6596,7 @@ packages:
   license: BSD-3-Clause
   license_family: BSD
   purls:
-  - pkg:pypi/jupyter-client?source=compressed-mapping
+  - pkg:pypi/jupyter-client?source=hash-mapping
   run_exports: {}
   size: 117954
   timestamp: 1781019994076
@@ -6677,7 +6715,7 @@ packages:
   license: BSD-3-Clause
   license_family: BSD
   purls:
-  - pkg:pypi/jupyter-server?source=compressed-mapping
+  - pkg:pypi/jupyter-server?source=hash-mapping
   run_exports: {}
   size: 363068
   timestamp: 1781713810089
@@ -7797,7 +7835,7 @@ packages:
   license: BSD-3-Clause
   license_family: BSD
   purls:
-  - pkg:pypi/traitlets?source=hash-mapping
+  - pkg:pypi/traitlets?source=compressed-mapping
   run_exports: {}
   size: 115158
   timestamp: 1780507822178
@@ -8017,6 +8055,30 @@ packages:
     - genfit >=2.3.0,<2.4.0a0
   size: 776440
   timestamp: 1784212544641
+- conda: https://prefix.dev/ship/linux-64/genie-3.06.02-pythia6_6578b0d_2.conda
+  sha256: 23c6c655e2755ecd1ea5385ec91ada2e607387097c23109d7ce49c61bcf2bbb0
+  md5: 2103898979b151a5d0f29abf07d24b62
+  depends:
+  - genie-data ==3.6.2
+  - libnsl
+  - libstdcxx >=15
+  - libgcc >=15
+  - __glibc >=2.17,<3.0.a0
+  - lhapdf >=6.5.6,<6.6.0a0
+  - root_base >=6.40.2,<6.40.3.0a0
+  - rootegpythia6 >=0.1,<0.2.0a0
+  - gsl >=2.7,<2.8.0a0
+  - pythia6 >=6.4.28,<6.5.0a0
+  - log4cpp >=1.1.4,<1.2.0a0
+  - root_cxx_standard ==20
+  - libxml2
+  - libxml2-16 >=2.15.3
+  license: GPL-3.0-or-later
+  run_exports:
+    weak:
+    - genie >=3.6.2,<3.7.0a0
+  size: 4449586
+  timestamp: 1784619098814
 - conda: https://prefix.dev/ship/linux-64/pythia6-6.4.28-hb0f4dca_6.conda
   sha256: a5f378d93f4d8425451552ac0fb916e4b271f47ba7428441332c66661321d893
   md5: d453c87ccf91a75e2f2ad2c26e20a4ab
@@ -8048,6 +8110,13 @@ packages:
     - rootegpythia6 >=0.1,<0.2.0a0
   size: 78701
   timestamp: 1783372699569
+- conda: https://prefix.dev/ship/noarch/genie-data-3.06.02-h4616a5c_0.conda
+  sha256: 3420dad73db3c74d6a1ddda9fcdc6c3a1958ec97874818ba0d924fa4fdc0ec74
+  md5: 98a97c57f8ff1b2f6bd6fea7809e0598
+  license: GPL-3.0-or-later
+  run_exports: {}
+  size: 118623406
+  timestamp: 1783372699559
 - conda: https://prefix.dev/ship/noarch/ship-ci-metrics-0.1.0-pyh4616a5c_0.conda
   sha256: a47f03ad1b40ed0fce43685ec3dcd3616bc722346dac74ac37e9532c421cc5ce
   md5: c8eba8490e606a2e2e814ae334f7dc6f
