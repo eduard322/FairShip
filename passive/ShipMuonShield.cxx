@@ -454,6 +454,34 @@ void ShipMuonShield::ConstructGeometry() {
   // Place in origin of SHiP coordinate system as subnodes placed correctly
   top->AddNode(tShield, 1);
 
+  // --- SND copper plates (Design 4): passive Cu slabs above and below the
+  //     SiWCalo, spanning the full gap between the two SND middle magnets
+  //     (Magn[nMagnets-3] = "Magn5" and Magn[nMagnets-2] = "Magn6"). ---
+  if (fCopperPlates && snd_dimensions.count("SiWCalo")) {
+    ShipGeo::InitMedium("copper");
+    TGeoMedium* copper = gGeoManager->GetMedium("copper");
+
+    // z-span = the physical gap between the two middle magnets.
+    Double_t z5_down = Z[nMagnets - 3] + Z_relf[nMagnets - 3];
+    Double_t z6_up = Z[nMagnets - 2] - Z_relf[nMagnets - 2];
+    Double_t plate_zc = 0.5 * (z5_down + z6_up);
+    Double_t plate_hz = 0.5 * (z6_up - z5_down);
+
+    Double_t plate_hx = fCopperPlateWidth / 2.;
+    Double_t plate_hy = fCopperPlateThickness / 2.;
+    // Flush against the SiWCalo top/bottom faces.
+    Double_t siwcalo_hy = snd_dimensions.at("SiWCalo").at("dy") / 2.;
+    Double_t plate_yc = siwcalo_hy + plate_hy;
+
+    TGeoVolume* cuPlate = gGeoManager->MakeBox("SND_CuPlate", copper, plate_hx,
+                                               plate_hy, plate_hz);
+    cuPlate->SetLineColor(kOrange + 7);
+    tShield->AddNode(cuPlate, 1,
+                     new TGeoTranslation(0., plate_yc, plate_zc));  // top
+    tShield->AddNode(cuPlate, 2,
+                     new TGeoTranslation(0., -plate_yc, plate_zc));  // bottom
+  }
+
   Double_t absorber_offset = dZf[0];
   Double_t absorber_half_length = (Z_relf[0]);
 
