@@ -163,7 +163,7 @@ def configure_snd_siliconTarget(yaml_file: str, ship_geo) -> None:
         ship_geo.SiliconTarget_geo.SiliconTarget_total_length = (
             ship_geo.SiliconTarget_geo.targetSpacing * ship_geo.SiliconTarget_geo.nLayers
         )
-        if 3 in getattr(ship_geo, "SND_design", []):
+        if any(x in getattr(ship_geo, "SND_design", []) for x in (3, 4)):
             # SiWCalo is configured after SiliconTarget, so its length isn't in
             # ship_geo yet — read it from the sibling config file into a local
             # only; ship_geo.SiWCalo_geo stays owned by configure_snd_SiWCalo.
@@ -173,9 +173,10 @@ def configure_snd_siliconTarget(yaml_file: str, ship_geo) -> None:
             SiWCalo_total_length = siwcalo_geo.targetSpacing * siwcalo_geo.nLayers
         else:
             SiWCalo_total_length = 0.0
+        mtc_gap = getattr(ship_geo, "snd_mtc_gap", ship_geo.muShield.Zgap[-2])
         ship_geo.SiliconTarget_geo.zPosition = (
             ship_geo.muShield.Entrance[-2]
-            - ship_geo.muShield.Zgap[-2]
+            - mtc_gap
             - SiWCalo_total_length
             - ship_geo.SiliconTarget_geo.SiliconTarget_total_length / 2
         )
@@ -378,6 +379,24 @@ def configure(run, ship_geo):
                         os.path.join(os.environ["FAIRSHIP"], "geometry", config + ".yaml"), ship_geo
                     )
 
+            elif design == 4:
+                # SND design 4 -- design 3 layout, but SiWCalo<->MTC gap = mtcGap
+                # (default 1 cm) and copper plates across the Magn5-Magn6 gap.
+                siwcalo_yaml = os.path.join(os.environ["FAIRSHIP"], "geometry", "SiWCalo_config.yaml")
+                with open(siwcalo_yaml) as siwcalo_file:
+                    siwcalo_cfg = yaml.safe_load(siwcalo_file)["SiWCalo"]
+                ship_geo.snd_mtc_gap = siwcalo_cfg["mtcGap"] * u.cm
+                ship_geo.snd_copper_plates = siwcalo_cfg["copperPlates"]
+                detector_configs = {
+                    "MTC_config": configure_snd_mtc,
+                    "SiliconTarget_config": configure_snd_siliconTarget,
+                    "SiWCalo_config": configure_snd_SiWCalo,
+                }
+                for config in detector_configs:
+                    detector_configs[config](
+                        os.path.join(os.environ["FAIRSHIP"], "geometry", config + ".yaml"), ship_geo
+                    )
+
             else:
                 print(f"Warning: SND design {design} is not recognized.")
 
@@ -392,7 +411,7 @@ def configure(run, ship_geo):
 
     if ship_geo.SND:
         # set SNDSpace for MuonShield for any design containing MTC (2 or 3)
-        if any(x in getattr(ship_geo, "SND_design", []) for x in (2, 3)):
+        if any(x in getattr(ship_geo, "SND_design", []) for x in (2, 3, 4)):
             snd_dimensions = {
                 "MTC": {
                     "dx": ship_geo.mtc_geo.width,
@@ -407,17 +426,21 @@ def configure(run, ship_geo):
                     "length": ship_geo.SiliconTarget_geo.SiliconTarget_total_length,
                 },
             }
-            if 3 in ship_geo.SND_design:
+            if any(x in ship_geo.SND_design for x in (3, 4)):
                 snd_dimensions["SiWCalo"] = {
                     "dx": ship_geo.SiWCalo_geo.targetWidth,
                     "dy": ship_geo.SiWCalo_geo.targetHeight,
                     "z_pos": ship_geo.SiWCalo_geo.zPosition,
                     "length": ship_geo.SiWCalo_geo.SiWCalo_total_length,
                 }
+            cu = getattr(ship_geo, "snd_copper_plates", {"enabled": False, "width": 0.0, "thickness": 0.0})
             MuonShield.SetSNDSpace(
                 hole=True,
                 fillIron=True,  # False: legacy full-length hole
                 snd_dimensions=snd_dimensions,
+                copperPlates=bool(cu["enabled"]),
+                plateWidth=cu["width"] * u.cm,
+                plateThickness=cu["thickness"] * u.cm,
             )
     detectorList.append(MuonShield)
 
