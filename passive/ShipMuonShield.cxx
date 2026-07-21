@@ -54,10 +54,15 @@ ShipMuonShield::ShipMuonShield(std::vector<double> in_params, Double_t z,
 }
 
 void ShipMuonShield::SetSNDSpace(Bool_t hole, Bool_t fillIron,
-                                 const SNDDimensions& dimensions) {
+                                 const SNDDimensions& dimensions,
+                                 Bool_t copperPlates, Double_t plateWidth,
+                                 Double_t plateThickness) {
   snd_hole = hole;
   fill_iron = fillIron;
   snd_dimensions = dimensions;
+  fCopperPlates = copperPlates;
+  fCopperPlateWidth = plateWidth;
+  fCopperPlateThickness = plateThickness;
   if (!fill_iron) {
     // Legacy full-length hole must clear the largest SND subdetector
     // (plus 5 cm clearance). The hole is cut in 2 halves (one per

@@ -32,7 +32,9 @@ class ShipMuonShield : public FairModule {
   ~ShipMuonShield() override;
   void ConstructGeometry() override;
   void SetSNDSpace(Bool_t hole, Bool_t fillIron,
-                   const SNDDimensions& snd_dimensions);
+                   const SNDDimensions& snd_dimensions,
+                   Bool_t copperPlates = false, Double_t plateWidth = 0.,
+                   Double_t plateThickness = 0.);
 
  protected:
   Double_t dZ0{0.}, dZ1{0.}, dZ2{0.}, dZ3{0.}, dZ4{0.}, dZ5{0.}, dZ6{0.},
@@ -46,6 +48,8 @@ class ShipMuonShield : public FairModule {
   Bool_t fill_iron{true};
   SNDDimensions snd_dimensions{};
   Double_t snd_hole_dx = 0., snd_hole_dy = 0.;
+  Bool_t fCopperPlates{false};
+  Double_t fCopperPlateWidth{0.}, fCopperPlateThickness{0.};
 
   void CreateArb8(const TString& arbName, TGeoMedium* medium, Double_t dZ,
                   std::array<Double_t, 16> corners, Int_t color,
