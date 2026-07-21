@@ -368,7 +368,7 @@ parser.add_argument(
 parser.add_argument("--SND", dest="SND", help="Activate SND.", action="store_true")
 parser.add_argument(
     "--SND_design",
-    help="Choose SND design(s) among [1,2,...] or 'all' to enable all. 1: EmulsionTarget, 2: MTC + SiliconTarget,  3: MTC + SiliconTarget + SiW Pixels",
+    help="Choose SND design(s) among [1,2,...] or 'all' to enable all. 1: EmulsionTarget, 2: MTC + SiliconTarget, 3: MTC + SiliconTarget + SiW Pixels, 4: same as 3 with 1cm SiWCalo-MTC gap + copper plates",
     nargs="+",
     default=[3],
 )
@@ -393,7 +393,7 @@ parser.add_argument(
 
 options = parser.parse_args()
 # Handle SND_design: allow 'all' (case-insensitive) or list of ints
-available_snd_designs = [1, 2, 3]  # Extend this list as new designs are added
+available_snd_designs = [1, 2, 3, 4]  # Extend this list as new designs are added
 if any(str(x).lower() == "all" for x in options.SND_design):
     options.SND_design = available_snd_designs
 else:
