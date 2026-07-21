@@ -416,7 +416,7 @@ environments:
       - conda: https://prefix.dev/ship/linux-64/fairroot-19.0.1-h6afcf60_12.conda
       - conda: https://prefix.dev/ship/linux-64/geant3-4.5-h6afcf60_7.conda
       - conda: https://prefix.dev/ship/linux-64/genfit-2.3.0-h6afcf60_10.conda
-      - conda: https://prefix.dev/ship/linux-64/genie-3.06.02-pythia6_6578b0d_2.conda
+      - conda: https://prefix.dev/ship/linux-64/genie-3.06.02-pythia8_d593e58_3.conda
       - conda: https://prefix.dev/ship/linux-64/pythia6-6.4.28-hb0f4dca_6.conda
       - conda: https://prefix.dev/ship/linux-64/rootegpythia6-0.1-hc97bc57_9.conda
       - conda: https://prefix.dev/ship/noarch/genie-data-3.06.02-h4616a5c_0.conda
@@ -845,7 +845,7 @@ environments:
       - conda: https://prefix.dev/ship/linux-64/fairroot-19.0.1-h6afcf60_12.conda
       - conda: https://prefix.dev/ship/linux-64/geant3-4.5-h6afcf60_7.conda
       - conda: https://prefix.dev/ship/linux-64/genfit-2.3.0-h6afcf60_10.conda
-      - conda: https://prefix.dev/ship/linux-64/genie-3.06.02-pythia6_6578b0d_2.conda
+      - conda: https://prefix.dev/ship/linux-64/genie-3.06.02-pythia8_d593e58_3.conda
       - conda: https://prefix.dev/ship/linux-64/pythia6-6.4.28-hb0f4dca_6.conda
       - conda: https://prefix.dev/ship/linux-64/rootegpythia6-0.1-hc97bc57_9.conda
       - conda: https://prefix.dev/ship/noarch/genie-data-3.06.02-h4616a5c_0.conda
@@ -8055,30 +8055,29 @@ packages:
     - genfit >=2.3.0,<2.4.0a0
   size: 776440
   timestamp: 1784212544641
-- conda: https://prefix.dev/ship/linux-64/genie-3.06.02-pythia6_6578b0d_2.conda
-  sha256: 23c6c655e2755ecd1ea5385ec91ada2e607387097c23109d7ce49c61bcf2bbb0
-  md5: 2103898979b151a5d0f29abf07d24b62
+- conda: https://prefix.dev/ship/linux-64/genie-3.06.02-pythia8_d593e58_3.conda
+  sha256: 6cef086dd230143cfa42119fc29f09560536a206bd922f33af5b491e6ab3dfc5
+  md5: 1f5406b9b0850246bd03e18fb7445518
   depends:
   - genie-data ==3.6.2
   - libnsl
+  - __glibc >=2.17,<3.0.a0
   - libstdcxx >=15
   - libgcc >=15
-  - __glibc >=2.17,<3.0.a0
-  - lhapdf >=6.5.6,<6.6.0a0
   - root_base >=6.40.2,<6.40.3.0a0
-  - rootegpythia6 >=0.1,<0.2.0a0
   - gsl >=2.7,<2.8.0a0
-  - pythia6 >=6.4.28,<6.5.0a0
-  - log4cpp >=1.1.4,<1.2.0a0
+  - pythia8 >=8.312,<8.400.0a0
+  - lhapdf >=6.5.6,<6.6.0a0
   - root_cxx_standard ==20
+  - log4cpp >=1.1.4,<1.2.0a0
   - libxml2
   - libxml2-16 >=2.15.3
   license: GPL-3.0-or-later
   run_exports:
     weak:
     - genie >=3.6.2,<3.7.0a0
-  size: 4449586
-  timestamp: 1784619098814
+  size: 4498411
+  timestamp: 1784654164359
 - conda: https://prefix.dev/ship/linux-64/pythia6-6.4.28-hb0f4dca_6.conda
   sha256: a5f378d93f4d8425451552ac0fb916e4b271f47ba7428441332c66661321d893
   md5: d453c87ccf91a75e2f2ad2c26e20a4ab

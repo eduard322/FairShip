@@ -3,7 +3,7 @@ MTC:
   height: 60 # Active area height (cm)
   angle: 5 # Tilt angle of fibers (degrees)
   ironThick: 5 # Magnetised iron thickness (cm)
-  sciFiThick: 0.97 # SciFi layer thickness (cm)
+  sciFiThick: 1.0 # SciFi layer thickness (cm)
   num_of_agg_channels: 4 # Number of SiPM channels to be aggregated
   scintThick: 2.0 # Scintillator layer thickness (cm)
   scint_cell_size: 5 # Scintillator tile cell size (cm)

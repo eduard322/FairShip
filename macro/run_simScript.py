@@ -370,7 +370,7 @@ parser.add_argument(
     "--SND_design",
     help="Choose SND design(s) among [1,2,...] or 'all' to enable all. 1: EmulsionTarget, 2: MTC + SiliconTarget, 3: MTC + SiliconTarget + SiW Pixels, 4: same as 3 with 1cm SiWCalo-MTC gap + copper plates",
     nargs="+",
-    default=[3],
+    default=[4],
 )
 parser.add_argument(
     "--noSND", dest="SND", help="Deactivate SND. NOOP, as it currently defaults to off.", action="store_false"
