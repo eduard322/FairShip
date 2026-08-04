@@ -15,9 +15,15 @@ environments:
     - https://pypi.org/simple
     packages:
       linux-64:
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/awkward-cpp-54-py313hd3cbb54_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/cramjam-2.11.0-py313h7ef63f5_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/lhapdf-6.5.6-py313hc8edb43_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/log4cpp-1.1.4-h59595ed_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/python-xxhash-3.7.0-py313heab5758_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/awkward-2.11.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/faircmakemodules-1.0.0-h98f672e_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/fsspec-2026.6.0-pyhd8ed1ab_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/uproot-5.7.5-pyhc364b38_0.conda
       - conda: https://prefix.dev/conda-forge/linux-64/_openmp_mutex-4.5-7_kmp_llvm.conda
       - conda: https://prefix.dev/conda-forge/linux-64/alsa-lib-1.2.16.1-hb03c661_0.conda
       - conda: https://prefix.dev/conda-forge/linux-64/argon2-cffi-bindings-25.1.0-py313h07c4f96_2.conda
@@ -430,9 +436,15 @@ environments:
     - https://pypi.org/simple
     packages:
       linux-64:
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/awkward-cpp-54-py313hd3cbb54_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/cramjam-2.11.0-py313h7ef63f5_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/lhapdf-6.5.6-py313hc8edb43_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/log4cpp-1.1.4-h59595ed_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/python-xxhash-3.7.0-py313heab5758_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/awkward-2.11.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/faircmakemodules-1.0.0-h98f672e_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/fsspec-2026.6.0-pyhd8ed1ab_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/uproot-5.7.5-pyhc364b38_0.conda
       - conda: https://prefix.dev/conda-forge/linux-64/_openmp_mutex-4.5-7_kmp_llvm.conda
       - conda: https://prefix.dev/conda-forge/linux-64/alsa-lib-1.2.16.1-hb03c661_0.conda
       - conda: https://prefix.dev/conda-forge/linux-64/argon2-cffi-bindings-25.1.0-py313h07c4f96_2.conda
@@ -857,6 +869,42 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/b6/e7/30e085b31fed978ecb675bdbb54df566673ab550469e5af2d350f6af0be6/pyrefly-1.1.1-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/d2/a8/84baf48e05b603480b963f655e73b97230f7296433d3cc8206b742c167fd/ignore_python-0.3.3-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
 packages:
+- conda: https://conda.anaconda.org/conda-forge/linux-64/awkward-cpp-54-py313hd3cbb54_0.conda
+  sha256: d7e06d978e1e866f3d955a63fca74484c9eeadf26ff4fb2965646fb72990b2a5
+  md5: 4c000a329a0de5055f60d7c7ef7e80f9
+  depends:
+  - python
+  - numpy >=1.21.3
+  - libstdcxx >=14
+  - libgcc >=14
+  - __glibc >=2.17,<3.0.a0
+  - _x86_64-microarch-level >=1
+  - python_abi 3.13.* *_cp313
+  license: BSD-3-Clause
+  license_family: BSD
+  purls:
+  - pkg:pypi/awkward-cpp?source=hash-mapping
+  run_exports: {}
+  size: 659971
+  timestamp: 1783197703355
+- conda: https://conda.anaconda.org/conda-forge/linux-64/cramjam-2.11.0-py313h7ef63f5_2.conda
+  sha256: de1acf0547cc7be6142df92b0da1c88a5bf780963cd243967e54af22652200ee
+  md5: 258369ffa865db10983e02b11bda29c3
+  depends:
+  - python
+  - __glibc >=2.17,<3.0.a0
+  - libstdcxx >=14
+  - libgcc >=14
+  - python_abi 3.13.* *_cp313
+  constrains:
+  - __glibc >=2.17
+  license: MIT
+  license_family: MIT
+  purls:
+  - pkg:pypi/cramjam?source=hash-mapping
+  run_exports: {}
+  size: 1817421
+  timestamp: 1763019878175
 - conda: https://conda.anaconda.org/conda-forge/linux-64/lhapdf-6.5.6-py313hc8edb43_2.conda
   sha256: 8a506caa0cdace6c18dd15da107139c775da1d7836d59fc5de7b64a819cf8886
   md5: 2b6ef4d00e7f91a260c1c73874181b0b
@@ -887,6 +935,41 @@ packages:
     - log4cpp >=1.1.4,<1.2.0a0
   size: 145540
   timestamp: 1683643099216
+- conda: https://conda.anaconda.org/conda-forge/linux-64/python-xxhash-3.7.0-py313heab5758_0.conda
+  sha256: 99323b49c012aea1988c9e9b3ee80f51fcbaabe6ff78f8b4ddedc870b47bb800
+  md5: 3e14deae910b2de18153b78a372a4a0e
+  depends:
+  - __glibc >=2.17,<3.0.a0
+  - libgcc >=14
+  - python >=3.13,<3.14.0a0
+  - python_abi 3.13.* *_cp313
+  - xxhash >=0.8.3,<0.8.4.0a0
+  license: BSD-2-Clause
+  license_family: BSD
+  purls:
+  - pkg:pypi/xxhash?source=hash-mapping
+  run_exports: {}
+  size: 24814
+  timestamp: 1779976918476
+- conda: https://conda.anaconda.org/conda-forge/noarch/awkward-2.11.0-pyhcf101f3_0.conda
+  sha256: 7e1eac785043901bfcda6ec3ec3eb82475194e6197e4551bdea0fc481d29b6d7
+  md5: 3c3ee515c2ea48e913ef072829f9f328
+  depends:
+  - python >=3.10
+  - awkward-cpp ==54
+  - importlib-metadata >=4.13.0
+  - numpy >=1.18.0
+  - packaging
+  - typing_extensions >=4.1.0
+  - fsspec >=2022.11.0
+  - python
+  license: BSD-3-Clause
+  license_family: BSD
+  purls:
+  - pkg:pypi/awkward?source=hash-mapping
+  run_exports: {}
+  size: 528608
+  timestamp: 1784660128611
 - conda: https://conda.anaconda.org/conda-forge/noarch/faircmakemodules-1.0.0-h98f672e_0.conda
   sha256: 2634b440823429b61cde095e1b0135aace6302238ab783049cac92c6922e4bcb
   md5: a0719b28c2a63aa871a65bfc7091ff7c
@@ -898,6 +981,38 @@ packages:
   run_exports: {}
   size: 18123
   timestamp: 1780676604349
+- conda: https://conda.anaconda.org/conda-forge/noarch/fsspec-2026.6.0-pyhd8ed1ab_0.conda
+  sha256: fe0156e6d658be3531aad2a99e42e8ad1ee23c69837d469c44c1b6010373913d
+  md5: 7d7e6c826ba0743fc491ebee0e7b899c
+  depends:
+  - python >=3.10
+  license: BSD-3-Clause
+  license_family: BSD
+  purls:
+  - pkg:pypi/fsspec?source=hash-mapping
+  run_exports: {}
+  size: 149709
+  timestamp: 1781615868173
+- conda: https://conda.anaconda.org/conda-forge/noarch/uproot-5.7.5-pyhc364b38_0.conda
+  sha256: ce6263442c38eb283f25f85bc1db8c61206c475f59ddf39d52624db7cebb08e7
+  md5: 7a6eb0b8390c673954b8756df2ed3526
+  depends:
+  - python >=3.10
+  - awkward >=2.4.6
+  - cramjam >=2.5.0
+  - python-xxhash
+  - numpy
+  - fsspec !=2026.2.0
+  - packaging
+  - typing_extensions >=4.1.0
+  - python
+  license: BSD-3-Clause
+  license_family: BSD
+  purls:
+  - pkg:pypi/uproot?source=hash-mapping
+  run_exports: {}
+  size: 284098
+  timestamp: 1783177995450
 - conda: https://prefix.dev/conda-forge/linux-64/_openmp_mutex-4.5-7_kmp_llvm.conda
   build_number: 7
   sha256: c0cddb66070dd6355311f7667ce2acccf70d1013edaa6e97f22859502fefdb22

@@ -54,6 +54,8 @@ cxx-compiler = "*"
 # Static analysis
 clang-tools = "*"  # provides clang-tidy
 genie = ">=3.6.2,<4"
+uproot = ">=5.7.5,<6"
+awkward = ">=2.11.0,<3"
 
 [pypi-dependencies]
 pyrefly = "*"
