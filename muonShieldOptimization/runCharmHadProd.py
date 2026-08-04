@@ -10,6 +10,15 @@ ncpus = 20
 msel = "4"
 # msel = "5"
 
+# Nuclear interaction length [cm] used by makeCascade to place cascade interaction
+# vertices. makeCascade requires this explicitly and offers no default. 12.0 is the
+# effective value for the legacy target over the first 50 cm, where the whole
+# cascade sits; it exceeds the pure-tungsten 10.31 cm because of the helium cooling
+# gaps between the front plates. Use 13.4 for the 2026 target design, whose thinner
+# front plates leave a larger gap fraction. Matched to FixedTargetGenerator so both
+# branches of the chain place charm at the same depth.
+cascade_lambda = "12.0"
+
 if msel == "4":
     nev = 2000000  # 0.1s / event
     path = "/afs/cern.ch/project/lbcern/vol1/truf/charm/"
@@ -45,6 +54,8 @@ def makeHadrons(run) -> None:
             + "-parp16-MSTP82-1-MSEL"
             + msel
             + ".root"
+            + " --cascade-lambda "
+            + cascade_lambda
         )
         # if not run in runList:
         os.system(cmd + " >log" + str(run) + " &")

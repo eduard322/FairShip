@@ -5,6 +5,7 @@
 # Output is an ntuple with muon/neutrinos
 import argparse
 import os
+from array import array
 
 import ROOT
 import rootUtils as ut
@@ -117,7 +118,18 @@ P8.init()
 
 # output ntuple:
 ftup = ROOT.TFile.Open(FOUT, "RECREATE")
-Ntup = ROOT.TNtuple("Decay", "pythia8 heavy flavour decays", "id:px:py:pz:E:M:weight:mid:mpx:mpy:mpz:mE:pot:ptGM:pzGM")
+# The charm production vertex is carried through unchanged from makeCascade.
+# Older productions predate it, so the fields are only added when the input has
+# them; the neutrino's own displacement from the charm vertex is sub-millimetre
+# (charm flight ~0.3 cm, almost entirely longitudinal) and is not added here.
+hasVertex = all(sTree.GetBranch(v) for v in ("vx", "vy", "vz"))
+branchList = "id:px:py:pz:E:M:weight:mid:mpx:mpy:mpz:mE:pot:ptGM:pzGM"
+if hasVertex:
+    branchList += ":vx:vy:vz"
+    print("Input has cascade vertices: propagating vx,vy,vz to the Decay ntuple")
+else:
+    print("WARNING: input has no vx,vy,vz (pre-vertex makeCascade output); Decay ntuple written without them")
+Ntup = ROOT.TNtuple("Decay", "pythia8 heavy flavour decays", branchList)
 
 h = {}
 # book hists for Genie neutrino momentum distrubition, just as check
@@ -179,23 +191,29 @@ for n in range(nEvents):
             if idabs > 11 and idabs < 17:
                 par = P8.event[n]
                 ptGM = ROOT.TMath.Sqrt(sTree.mpx * sTree.mpx + sTree.mpy * sTree.mpy)
-                Ntup.Fill(
-                    par.id(),
-                    par.px(),
-                    par.py(),
-                    par.pz(),
-                    par.e(),
-                    par.m(),
-                    wspill,
-                    sTree.id,
-                    sTree.px,
-                    sTree.py,
-                    sTree.pz,
-                    sTree.E,
-                    nrpotspill,
-                    ptGM,
-                    sTree.mpz,
+                vals = array(
+                    "f",
+                    [
+                        par.id(),
+                        par.px(),
+                        par.py(),
+                        par.pz(),
+                        par.e(),
+                        par.m(),
+                        wspill,
+                        sTree.id,
+                        sTree.px,
+                        sTree.py,
+                        sTree.pz,
+                        sTree.E,
+                        nrpotspill,
+                        ptGM,
+                        sTree.mpz,
+                    ],
                 )
+                if hasVertex:
+                    vals.extend((sTree.vx, sTree.vy, sTree.vz))
+                Ntup.Fill(vals)
                 # count total muons from charm/spill, and within some angular range..
                 if idabs == 16 or idabs == 14 or idabs == 12:
                     idhnu = idabs + 1000

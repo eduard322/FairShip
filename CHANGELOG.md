@@ -15,6 +15,9 @@ it in future.
 ### Added
 
 * 2026 BDF target design (33 pure tungsten disks with a larger rear block, steel core with serpentine He cooling grooves, jacket tube, flanges, upstream beam window and cover plate, and domed rear endcap), extracted from CATIA model ST1A07710_01_AB.02. Select with `--target-yaml geometry/target_config_2026.yaml`; the legacy design remains the default. Downstream elements are positioned using the nominal legacy target length so both designs can be compared directly.
+* Cascade vertex propagation in `makeCascade`: charm hadrons now carry the production point (`vx`, `vy`, `vz`) of the cascade interaction that made them, instead of being implicitly produced at the origin. A length scale is introduced solely to *place* interactions -- the flight length is drawn as `Exp(--cascade-lambda)` along the already-exact momentum direction and daughters inherit their parent's interaction vertex -- so the set of interactions, the charm yield and the `chicc` normalisation are unchanged. The draws come from a random stream separate from the physics one, so every pre-existing ntuple column reproduces bit for bit. `--cascade-lambda` is required and has no default; it is the nuclear interaction length, matched to `FixedTargetGenerator` so both branches of the chain place charm at the same depth. Use 12.0 cm for the legacy target and 13.4 cm for the 2026 target: these are the effective values over the first 50 cm, where the whole cascade sits, and they exceed the pure-tungsten 10.31 cm because of the helium cooling gaps between the front plates. The transverse beam spot is modelled with `--beam-smear`/`--beam-paint`, matching `run_fixedTarget.py` and `shipgen/BeamSmearingUtils.cxx`.
+* `makeCascade` reports how often the infinite-target assumption places a vertex outside the physical target (`--target-length`, `--target-radius`), plus vertex z and r histograms. Nothing is ever rejected on this; it only measures an assumption that was previously unquantified.
+* `makeDecay` propagates `vx`, `vy`, `vz` to the `Decay` ntuple when the input provides them, and still reads older cascade productions that do not.
 
 ### Changed
 
@@ -23,6 +26,7 @@ it in future.
 
 ### Fixed
 
+* `makeCascade` now seeds Python's `random` from `--seed`. It drives real physics decisions (the p/n target choice and the charm roll), but `random` self-seeds from OS entropy at import, so `--seed` previously reached Pythia6 only and two runs with the same seed produced different events — verified, 32 vs 28 charm entries for identical arguments. Runs are now reproducible from `--seed` alone.
 * `veto` now registers the configured `sensitiveMed` instead of a hardcoded medium name; previously any other value resolved to a null `TGeoMedium`
 
 ### Removed

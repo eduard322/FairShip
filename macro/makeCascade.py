@@ -12,6 +12,7 @@ from typing import Any
 
 import ROOT
 import rootUtils as ut
+import shipunit as u
 
 ROOT.gROOT.LoadMacro("$VMCWORKDIR/gconfig/basiclibs.C")
 ROOT.basiclibs()
@@ -56,11 +57,74 @@ ap.add_argument(
     help="Choices of Pythia tune are PoorE791 (default, settings with default Pythia6 pdf, based on getting <pt> at 500 GeV pi-) or LHCb (settings by LHCb for Pythia 6.427)",
     choices=["PoorE791", "LHCb"],
 )
+# Cascade vertex propagation: give the cascade a length scale, used ONLY to place
+# interactions, never to decide whether one happens. The set of interactions, the
+# charm yield and the chicc normalisation are untouched by these options.
+#
+# Choosing lambda. It is the nuclear INTERACTION length, matching
+# FixedTargetGenerator, which places charm vertices for the Geant4 branch of the
+# same chain by sampling the real geometry through TGeoMaterial::GetIntLen().
+# The value is not the pure-tungsten 10.31 cm: the helium cooling gaps are
+# concentrated at the front of the target, where the plates are still thin, and
+# that is exactly where this cascade lives -- particles below pbeaml are dropped,
+# so a 400 GeV proton lasts only ~4 interaction lengths (z ~ 48 cm) and never
+# reaches the copper and iron downstream. Effective values from the geometry,
+# averaged over the first 50 cm: legacy target 12.0 cm, 2026 target 13.4 cm.
+# Because the gaps dominate the difference, lambda must follow the target DESIGN,
+# not just its composition.
+ap.add_argument(
+    "--cascade-lambda",
+    type=float,
+    required=True,
+    help=(
+        "Nuclear interaction length [cm] for placing cascade interaction vertices. No default is provided "
+        "on purpose. Use 12.0 for the legacy target and 13.4 for the 2026 target: these are the effective "
+        "values over the first 50 cm, where the whole cascade sits, and they exceed the pure-tungsten "
+        "10.31 cm because of the helium cooling gaps between the front plates. Matched to "
+        "FixedTargetGenerator so both branches of the chain place charm at the same depth."
+    ),
+)
+# Beam spot. Defaults mirror macro/run_fixedTarget.py (--beam-smear, --beam-paint) and the
+# model of shipgen/BeamSmearingUtils.cxx: a Gaussian smear plus uniform circular painting.
+# The resulting transverse spread is sqrt(smear^2 + paint^2/2) = 3.88 cm for the defaults,
+# matching the 3.86/3.90 cm measured on the FairShip target simulation.
+ap.add_argument("--beam-smear", type=float, default=16.0, help="Gaussian transverse beam smearing [mm], default 16 mm")
+ap.add_argument(
+    "--beam-paint", type=float, default=50.0, help="Uniform circular beam painting radius [mm], default 50 mm"
+)
+ap.add_argument(
+    "--vertex-seed",
+    type=int,
+    default=None,
+    help=(
+        "Seed for the separate random stream used only for vertex placement, default: same as --seed. "
+        "This stream is deliberately kept apart from the physics stream so that adding vertices perturbs "
+        "no physics decision and every pre-existing ntuple column reproduces bit for bit."
+    ),
+)
+# Diagnostic only: makeCascade assumes an infinite target (every particle above pbeaml
+# interacts with certainty), so some vertices land beyond the physical target. Nothing is
+# rejected; the fraction outside is reported as a measurement of that assumption.
+ap.add_argument(
+    "--target-length",
+    type=float,
+    default=158.64,
+    help="Target length [cm] used only for the out-of-target diagnostic, default 158.64 (nominal SHiP target)",
+)
+ap.add_argument(
+    "--target-radius",
+    type=float,
+    default=12.5,
+    help="Target radius [cm] used only for the out-of-target diagnostic, default 12.5 (xy/2 = 25/2 cm)",
+)
 # some parameters for generating the chi (sigma(signal)/sigma(total) as a function of momentum
 ap.add_argument("--nev", type=int, default=5000, help="Events / momentum")
 ap.add_argument("--nrpoints", type=int, default=20, help="Number of momentum points taken to calculate sig/sigtot")
 
 args = ap.parse_args()
+if args.cascade_lambda <= 0:
+    print(f"Error: --cascade-lambda must be positive, got {args.cascade_lambda}")
+    sys.exit("ERROR on input, exit")
 if args.Fntuple == "":
     args.Fntuple = f"Cascade{int(args.nevgen / 1000)}k-parp16-MSTP82-1-MSEL{args.mselcb}-ntuple.root"
 
@@ -226,6 +290,87 @@ else:
 # start with different random number for each run...
 print(f"Setting random number seed = {args.seed}")
 myPythia.SetMRPY(1, args.seed)
+# Seed Python's stream as well. It drives real physics decisions -- the p/n target
+# choice and the charm roll -- but `random` self-seeds from OS entropy at import,
+# so before this line --seed reached Pythia6 only and two runs with the same seed
+# produced different events. Seeding it here is what makes a run reproducible, and
+# it is what allows this change to be validated by byte comparison against a
+# pre-change run.
+random.seed(args.seed)
+
+# ---------------------------------------------------------------------------
+# Cascade vertex placement
+#
+# makeCascade is a branching chain of interactions, not a transport simulation:
+# its stack entry has no position and every particle above pbeaml interacts with
+# certainty. Here a length scale is introduced that is used ONLY to place
+# interactions:
+#     L_i ~ Exp(lambda)                 one draw per stack pop
+#     vtx = prod_i + L_i * phat_i       phat_i is already known exactly
+#
+# A particle's production point is where its parent interacted, so the charm
+# vertex is the accumulated sum of L_i * phat_i along the chain that made it.
+#
+# The draws come from a SEPARATE random stream. makeCascade uses the `random`
+# module for physics decisions (the p/n target choice and the charm roll below),
+# so drawing lengths from the same stream would shift every subsequent decision
+# and turn the regenerated file into a different physics sample. Kept apart, the
+# change is strictly additive: every pre-existing column reproduces bit for bit.
+# ---------------------------------------------------------------------------
+vertex_rng = random.Random(args.seed if args.vertex_seed is None else args.vertex_seed)
+
+# the two options are in mm (as in run_fixedTarget.py); shipunit's base length is
+# the centimetre, so u.mm converts them to the cm the vertices are stored in
+beam_smear = args.beam_smear * u.mm
+beam_paint = args.beam_paint * u.mm
+
+
+def beamOffset() -> tuple[float, float]:
+    """Transverse offset [cm] of one proton on target.
+
+    Mirrors CalculateBeamOffset in shipgen/BeamSmearingUtils.cxx: a Gaussian
+    smear plus uniform circular painting. The combined spread is
+    sqrt(smear**2 + paint**2 / 2), i.e. a ring convolved with a Gaussian --
+    deliberately not refitted as a single Gaussian, because the transverse
+    illumination shape is exactly what the vertex is needed for.
+    """
+    dx = 0.0
+    dy = 0.0
+    if beam_smear > 0:
+        dx = vertex_rng.gauss(0.0, beam_smear)
+        dy = vertex_rng.gauss(0.0, beam_smear)
+    if beam_paint > 0:
+        phi = vertex_rng.uniform(0.0, 2.0 * ROOT.TMath.Pi())
+        dx += beam_paint * ROOT.TMath.Cos(phi)
+        dy += beam_paint * ROOT.TMath.Sin(phi)
+    return dx, dy
+
+
+def insideTarget(x: float, y: float, z: float) -> bool:
+    """Whether a vertex falls inside the physical target. Diagnostic only."""
+    return 0.0 <= z <= args.target_length and (x * x + y * y) <= args.target_radius**2
+
+
+# Diagnostic counters for the infinite-target assumption. Nothing is ever
+# rejected on these; they only measure how often it places a vertex outside.
+nInteractions = 0
+nInteractionsOutside = 0
+nCharm = 0
+nCharmOutside = 0
+# running sums, so the reported mean depth is exact rather than clipped by the
+# range of the diagnostic histograms
+sumInteractionZ = 0.0
+sumCharmZ = 0.0
+
+print(
+    f"Cascade vertices: lambda={args.cascade_lambda} cm, "
+    f"beam smear={args.beam_smear} mm, paint radius={args.beam_paint} mm "
+    f"(transverse spread {ROOT.TMath.Sqrt(beam_smear**2 + beam_paint**2 / 2.0):.3f} cm)"
+)
+print(
+    f"Vertex random stream seed = {args.seed if args.vertex_seed is None else args.vertex_seed} (separate from physics)"
+)
+print(f"Out-of-target diagnostic against length={args.target_length} cm, radius={args.target_radius} cm")
 
 # histogram helper
 h = {}
@@ -305,13 +450,20 @@ ut.bookHist(h, str(3), "D0 pt**2", 40, 0.0, 4.0)
 ut.bookHist(h, str(4), "D0 pt**2", 100, 0.0, 18.0)
 ut.bookHist(h, str(5), "D0 pt", 100, 0.0, 10.0)
 ut.bookHist(h, str(6), "D0 XF", 100, -1.0, 1.0)
+# cascade vertex diagnostics
+ut.bookHist(h, "vtxz", "cascade interaction vertex z (cm)", 200, 0.0, 400.0)
+ut.bookHist(h, "vtxr", "cascade interaction vertex r (cm)", 100, 0.0, 50.0)
+ut.bookHist(h, "cvtxz", "charm production vertex z (cm)", 200, 0.0, 400.0)
+ut.bookHist(h, "cvtxr", "charm production vertex r (cm)", 100, 0.0, 50.0)
 
 ftup = ROOT.TFile.Open(args.Fntuple, "RECREATE")
+# vx,vy,vz are appended last so that the field order of every pre-existing
+# column is unchanged (45 -> 48 fields).
 Ntup = ROOT.TNtuple(
     "pythia6",
     "pythia6 heavy flavour",
     "id:px:py:pz:E:M:mid:mpx:mpy:mpz:mE:mM:k:a0:a1:a2:a3:a4:a5:a6:a7:a8:a9:a10:a11:a12:a13:a14:a15:\
-s0:s1:s2:s3:s4:s5:s6:s7:s8:s9:s10:s11:s12:s13:s14:s15",
+s0:s1:s2:s3:s4:s5:s6:s7:s8:s9:s10:s11:s12:s13:s14:s15:vx:vy:vz",
 )
 
 # make sure all particles for cascade production are stable
@@ -324,19 +476,35 @@ for kf in idsig:
     myPythia.SetMDCY(kc, 1, 0)
 
 # Heterogeneous cascade-particle stack: each slot is replaced with a list
-# `[pid, px, py, pz, depth, history, ...]` once populated.
+# `[pid, px, py, pz, depth, history, ..., x0, y0, z0]` once populated, where
+# x0,y0,z0 [cm] is the point at which this particle was produced.
 stack: list[Any] = 1000 * [0]
 for iev in range(args.nevgen):
     if iev % 1000 == 0:
         print("Generate event ", iev)
     nstack = 0
     # put protons of energy pbeamh on the stack
-    # stack: PID, px, py, pz, cascade depth, nstack of mother
-    stack[nstack] = [2212, 0.0, 0.0, args.pbeamh, 1, 100 * [0], 100 * [0]]
+    # stack: PID, px, py, pz, cascade depth, nstack of mother, production point
+    beamx, beamy = beamOffset()
+    stack[nstack] = [2212, 0.0, 0.0, args.pbeamh, 1, 100 * [0], 100 * [0], beamx, beamy, 0.0]
     stack[nstack][5][0] = 2212
     while nstack >= 0:
         # generate a signal based on probabilities in hists i*10+8?
         ptot = ROOT.TMath.Sqrt(stack[nstack][1] ** 2 + stack[nstack][2] ** 2 + stack[nstack][3] ** 2)
+        # Place this interaction. The direction is known exactly from the stored
+        # momentum; only the flight length is drawn. Both things done with this
+        # particle below -- the charm roll and the cascade step -- are the same
+        # physical interaction and therefore share this one vertex.
+        flight = vertex_rng.expovariate(1.0 / args.cascade_lambda)
+        vtxx = stack[nstack][7] + flight * stack[nstack][1] / ptot
+        vtxy = stack[nstack][8] + flight * stack[nstack][2] / ptot
+        vtxz = stack[nstack][9] + flight * stack[nstack][3] / ptot
+        nInteractions += 1
+        sumInteractionZ += vtxz
+        if not insideTarget(vtxx, vtxy, vtxz):
+            nInteractionsOutside += 1
+        h["vtxz"].Fill(vtxz)
+        h["vtxr"].Fill(ROOT.TMath.Sqrt(vtxx**2 + vtxy**2))
         prbsig = 0.0
         idpn = 0
         for i in range(1, id + 1):
@@ -381,7 +549,18 @@ for iev in range(args.nevgen):
                     vl.append(float(myPythia.GetMSTI(1)))
                     for i in range(nsub + 1, 16):
                         vl.append(float(0))
+                    # production point of this charm hadron: the interaction
+                    # vertex of the cascade particle that made it
+                    vl.append(float(vtxx))
+                    vl.append(float(vtxy))
+                    vl.append(float(vtxz))
                     Ntup.Fill(vl)
+                    nCharm += 1
+                    sumCharmZ += vtxz
+                    if not insideTarget(vtxx, vtxy, vtxz):
+                        nCharmOutside += 1
+                    h["cvtxz"].Fill(vtxz)
+                    h["cvtxr"].Fill(ROOT.TMath.Sqrt(vtxx**2 + vtxy**2))
                     charmFound.append(itrk)
                     h["1"].Fill(myPythia.GetP(itrk, 4))
                     h["2"].Fill(stack[nstack][4])
@@ -405,6 +584,9 @@ for iev in range(args.nevgen):
                     if myPythia.GetK(itP, 1) == 1:
                         # store only undecayed particle and no charm found
                         # ***WARNING****: with new with new ancestor and process info (a0-15, s0-15) add to ntuple, might not work???
+                        # ***WARNING****: this positional Fill also leaves the vx,vy,vz
+                        # fields unset. The interaction vertex for these particles is
+                        # (vtxx, vtxy, vtxz); wire it in if this branch is ever repaired.
                         Ntup.Fill(
                             float(myPythia.GetK(itP, 2)),
                             float(myPythia.GetP(itP, 1)),
@@ -470,9 +652,36 @@ for iev in range(args.nevgen):
                                 icas,
                                 tmp,
                                 stmp,
+                                # daughters are produced where the parent interacted
+                                vtxx,
+                                vtxy,
+                                vtxz,
                             ]
 
 print("Now at Ntup.Write()")
+
+# Diagnostic on the infinite-target assumption. makeCascade lets every particle
+# above pbeaml interact with certainty, with no escape and no survival
+# probability, so a fraction of the cascade necessarily lands beyond the physical
+# target. Nothing was rejected; this reports how large that fraction is.
+print(" ")
+print("*** cascade vertex diagnostics ***")
+print(f"target assumed: 0 < z < {args.target_length} cm, r < {args.target_radius} cm")
+if nInteractions > 0:
+    print(
+        f"interaction vertices: {nInteractions}, outside target: {nInteractionsOutside} "
+        f"({100.0 * nInteractionsOutside / nInteractions:.2f}%), mean z = {sumInteractionZ / nInteractions:.2f} cm"
+    )
+if nCharm > 0:
+    print(
+        f"charm production vertices: {nCharm}, outside target: {nCharmOutside} "
+        f"({100.0 * nCharmOutside / nCharm:.2f}%), mean z = {sumCharmZ / nCharm:.2f} cm"
+    )
+else:
+    print("charm production vertices: none")
+print("*** cascade vertex diagnostics ***")
+print(" ")
+
 Ntup.Write()
 for akey in h:
     h[akey].Write()
