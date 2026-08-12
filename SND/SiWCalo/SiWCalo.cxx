@@ -251,6 +251,18 @@ Bool_t SiWCalo::ProcessHits(FairVolume* vol) {
     Double_t ymean = (fPos.Y() + Pos.Y()) / 2.;
     Double_t zmean = (fPos.Z() + Pos.Z()) / 2.;
 
+    // The sensitive volume is the PIXEL_Y division, nested inside the PIXEL_X
+    // division of SensorVolume, whose copy number carries the layer ID
+    // (sensor_id = layerId << 5, see CreateSiliconPlanes).
+    Int_t pixel_y = 0;
+    Int_t pixel_x = 0;
+    Int_t sensor_id = 0;
+    gMC->CurrentVolID(pixel_y);
+    gMC->CurrentVolOffID(1, pixel_x);
+    gMC->CurrentVolOffID(2, sensor_id);
+    // 8 bits per pixel index (fNPixels <= 255)
+    fVolumeID = (sensor_id << 16) + (pixel_x << 8) + pixel_y;
+
     AddHit(fTrackID, fVolumeID, TVector3(xmean, ymean, zmean),
            TVector3(fMom.Px(), fMom.Py(), fMom.Pz()), fTime, fLength, fELoss,
            pdgCode);
